@@ -83,6 +83,18 @@ Valid options include:
 		(const "Date")
 		(const "Views")
 		(const "Rating"))
+
+(defcustom yeetube-default-sort-column "Title"
+  "Which column to sort the search results table."
+  :type '(radio (const "Title")
+                (const "Views")
+                (const "Duration")
+                (const "Channel"))
+  :group 'yeetube)
+
+(defcustom yeetube-default-sort-ascending nil
+  "Whether to sort the search results in ascending order."
+  :type 'boolean
   :group 'yeetube)
 
 (defgroup yeetube-faces nil
@@ -496,7 +508,8 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
                                                    :duration 'yeetube-face-duration
                                                    :channel 'yeetube-face-channel)))
 		(reverse yeetube-content))
-	tabulated-list-sort-key nil)
+	tabulated-list-sort-key (cons yeetube-default-sort-column
+                                      yeetube-default-sort-ascending))
   (display-line-numbers-mode 0)
   (tabulated-list-init-header)
   (tabulated-list-print))
