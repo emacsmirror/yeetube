@@ -463,7 +463,8 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
                                                    :view-count 'yeetube-face-view-count
                                                    :duration 'yeetube-face-duration
                                                    :channel 'yeetube-face-channel)))
-		yeetube-content))
+		(reverse yeetube-content))
+	tabulated-list-sort-key nil)
   (display-line-numbers-mode 0)
   (tabulated-list-init-header)
   (tabulated-list-print))
