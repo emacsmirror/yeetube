@@ -2,6 +2,7 @@
 
 # YeeTube
 
+![yeetube showcase](/showcase/example.gif?raw=true "Showcase Yeetube")
 ## About 
 
 This package provides the ability to scrape YouTube, with the results
