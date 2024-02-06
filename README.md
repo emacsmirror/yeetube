@@ -1,7 +1,6 @@
-[![self-host-badge](https://img.shields.io/badge/Repository-Self_hosted-black?logo=git&logoColor=red)](https://git.thanosapollo.org/yeetube/about)
 [![MELPA](https://melpa.org/packages/yeetube-badge.svg)](https://melpa.org/#/yeetube)
 
-# Yeetube | Emacs' Youtube Front End
+# YeeTube
 
 ## About 
 
@@ -16,12 +15,9 @@ Package functionality includes:
 - Bookmark/Save video url
 - Download video *using yt-dlp*
 - A minimal yt-dlp front-end, *which is independent of the rest
-  YouTube functionality*, to download multiple urls.
+  YouTube functionality*.
 
-*Inspired by [ytfzf](https://github.com/pystardust/ytfzf) &
-[ytel](https://github.com/grastello/ytel)*
-
-*This package does not use Invidious or YouTube's API, just parses
+*This package does not use Invidious or YouTube's API, just "parses"
 html & json.*
 
 
