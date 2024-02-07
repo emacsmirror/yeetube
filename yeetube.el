@@ -5,7 +5,7 @@
 ;; Author: Thanos Apollo <public@thanosapollo.org>
 ;; Keywords: extensions youtube videos
 ;; URL: https://git.thanosapollo.org/yeetube
-;; Version: 2.0.10
+;; Version: 2.1.0
 
 
 ;; Package-Requires: ((emacs "27.2") (compat "29.1.4.2"))
@@ -71,6 +71,20 @@ Example Usage:
 (defcustom yeetube-download-directory "~/Downloads"
   "Default directory to downlaod videos."
   :type 'string
+  :group 'yeetube)
+
+(defcustom yeetube-filter "Relevance"
+  "Sorty search results for value.
+
+Valid options include:
+- \"Relevance\"
+- \"Date\"
+- \"Views\"
+- \"Rating\""
+  :type '(radio (const "Relevance")
+		(const "Date")
+		(const "Views")
+		(const "Rating"))
   :group 'yeetube)
 
 (defgroup yeetube-faces nil
@@ -250,6 +264,16 @@ This is used to download thumbnails from `yeetube-content', within
 		   (concat "wget " (shell-quote-argument thumbnail) " -O" (shell-quote-argument title))
 		   nil 0)))))
 
+(defvar yeetube-filter-code-alist
+  '(("Relevance" . "CAASAhAB")
+    ("Date" . "CAISAhAB")
+    ("Views" . "CAMSAhAB")
+    ("Rating" . "CAESAhAB")))
+
+(defun yeetube-get-filter-code (filter)
+  "Get filter code for sorting search results."
+  (cdr (assoc filter yeetube-filter-code-alist)))
+
 ;;;###autoload
 (defun yeetube-search (query)
   "Search for QUERY."
@@ -259,15 +283,15 @@ This is used to download thumbnails from `yeetube-content', within
        (concat "https://youtube.com/search?q="
 	       (replace-regexp-in-string " " "+" query)
 	       ;; Filter parameter to remove live videos.
-	       "&sp=EgQQASAB")
+	       "&sp="
+	       (yeetube-get-filter-code yeetube-filter))
        'silent 'inhibit-cookies 30)
     (decode-coding-region (point-min) (point-max) 'utf-8)
     (goto-char (point-min))
     (toggle-enable-multibyte-characters)
-    (yeetube-get-content)
+    (yeetube-get-content))
     ;; (yeetube-get-thumbnails yeetube-content) ;; download thumbnails
-    ;; unfortunately can't use images them with tabulated list
-    )
+    ;; unfortunately we can't use images them with tabulated list
   (with-current-buffer
       (switch-to-buffer (get-buffer-create (concat "*yeetube*")))
     (yeetube-mode)))
