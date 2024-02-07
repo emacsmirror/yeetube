@@ -264,6 +264,11 @@ This is used to download thumbnails from `yeetube-content', within
 		   (concat "wget " (shell-quote-argument thumbnail) " -O" (shell-quote-argument title))
 		   nil 0)))))
 
+(defvar yeetube-filter-code-alist
+  '(("Relevance" . "CAASAhAB")
+    ("Date" . "CAISAhAB")
+    ("Views" . "CAMSAhAB")
+    ("Rating" . "CAESAhAB")))
 ;;;###autoload
 (defun yeetube-search (query)
   "Search for QUERY."
