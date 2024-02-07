@@ -73,6 +73,20 @@ Example Usage:
   :type 'string
   :group 'yeetube)
 
+(defcustom yeetube-sort-by "Relevance"
+  "Sorty search results for value.
+
+Valid options include:
+- \"Relevance\"
+- \"Date\"
+- \"Views\"
+- \"Rating\""
+  :type '(radio (const "Relevance")
+		(const "Date")
+		(const "Views")
+		(const "Rating"))
+  :group 'yeetube)
+
 (defgroup yeetube-faces nil
   "Faces used by yeetube."
   :group 'yeetube
