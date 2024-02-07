@@ -82,8 +82,7 @@ For example:
 (setf yeetube-filter "Views")
 ```
 
-This will filter & sort the search results according to the number of
-each video.
+This will filter & sort the search results according to the number of views.
 
 
 ### FAQ
