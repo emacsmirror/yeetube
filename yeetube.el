@@ -269,6 +269,11 @@ This is used to download thumbnails from `yeetube-content', within
     ("Date" . "CAISAhAB")
     ("Views" . "CAMSAhAB")
     ("Rating" . "CAESAhAB")))
+
+(defun yeetube-get-filter-code (sort-by)
+  "Get filter code for sorting search results."
+  (cdr (assoc sort-by yeetube-filter-code-alist)))
+
 ;;;###autoload
 (defun yeetube-search (query)
   "Search for QUERY."
