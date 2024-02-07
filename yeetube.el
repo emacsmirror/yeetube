@@ -283,7 +283,8 @@ This is used to download thumbnails from `yeetube-content', within
        (concat "https://youtube.com/search?q="
 	       (replace-regexp-in-string " " "+" query)
 	       ;; Filter parameter to remove live videos.
-	       "&sp=EgQQASAB")
+	       "&sp="
+	       (yeetube-get-filter-code yeetube-sort-by))
        'silent 'inhibit-cookies 30)
     (decode-coding-region (point-min) (point-max) 'utf-8)
     (goto-char (point-min))
