@@ -71,6 +71,21 @@ packages like so:
 Make sure that the media player of your choice can directly play
 youtube urls.
 
+### Apply Filters
+
+To filter the search results based on a specific criterion, you can
+modify the `yeetube-filter` value to your preferred option.
+
+For example:
+
+```emacs-lisp
+(setf yeetube-filter "Views")
+```
+
+This will filter & sort the search results according to the number of
+each video.
+
+
 ### FAQ
 #### Feature request: display thumbnails
 Formatting images in a text buffer is not something that I found easy
