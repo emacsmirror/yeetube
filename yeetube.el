@@ -75,7 +75,6 @@ Example Usage:
 
 (defcustom yeetube-filter "Relevance"
   "Sorty search results for value.
-
 Valid options include:
 - \"Relevance\"
 - \"Date\"
