@@ -73,7 +73,7 @@ Example Usage:
   :type 'string
   :group 'yeetube)
 
-(defcustom yeetube-sort-by "Relevance"
+(defcustom yeetube-filter "Relevance"
   "Sorty search results for value.
 
 Valid options include:
@@ -270,9 +270,9 @@ This is used to download thumbnails from `yeetube-content', within
     ("Views" . "CAMSAhAB")
     ("Rating" . "CAESAhAB")))
 
-(defun yeetube-get-filter-code (sort-by)
+(defun yeetube-get-filter-code (filter)
   "Get filter code for sorting search results."
-  (cdr (assoc sort-by yeetube-filter-code-alist)))
+  (cdr (assoc filter yeetube-filter-code-alist)))
 
 ;;;###autoload
 (defun yeetube-search (query)
@@ -284,7 +284,7 @@ This is used to download thumbnails from `yeetube-content', within
 	       (replace-regexp-in-string " " "+" query)
 	       ;; Filter parameter to remove live videos.
 	       "&sp="
-	       (yeetube-get-filter-code yeetube-sort-by))
+	       (yeetube-get-filter-code yeetube-filter))
        'silent 'inhibit-cookies 30)
     (decode-coding-region (point-min) (point-max) 'utf-8)
     (goto-char (point-min))
