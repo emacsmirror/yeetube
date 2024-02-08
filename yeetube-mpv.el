@@ -31,6 +31,9 @@
   :type 'boolean
   :group 'yeetube)
 
+(defcustom yeetube-mpv-enable-torsocks nil
+  "Enable torsocks.")
+
 (defvar yeetube-mpv-path (executable-find "mpv")
   "Path for mpv executable.")
 
