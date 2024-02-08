@@ -73,10 +73,14 @@
 This function is not specific to just playing urls.  Feel free to use
 to play local files."
   (yeetube-mpv-process
-   (concat yeetube-mpv-path " "
+   (concat (when yeetube-mpv-enable-torsocks
+	     (concat yeetube-mpv-torsocks " "))
+	   yeetube-mpv-path " "
 	   (shell-quote-argument input)
 	   (when yeetube-mpv-disable-video " --no-video")))
-  (message "yeetube: starting mpv process"))
+  (message (if yeetube-mpv-enable-torsocks
+	       "yeetube: Starting mpv process (using torsocks)"
+	     "yeetube: Starting mpv process")))
 
 (defun yeetube-mpv-toggle-no-video-flag ()
   "Toggle no video flag for mpv player."
