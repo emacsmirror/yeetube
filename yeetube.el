@@ -471,6 +471,7 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
   "P" #'yeetube-play-saved-video
   "r" #'yeetube-replay
   "t" #'yeetube-view-thumbnail
+  "T" #'yeetube-mpv-toggle-torsocks
   "q" #'quit-window)
 
 (define-derived-mode yeetube-mode tabulated-list-mode "Yeetube"
