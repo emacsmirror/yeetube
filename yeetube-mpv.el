@@ -40,6 +40,15 @@
 (defvar yeetube-mpv-torsocks (executable-find "torsocks")
   "Path to torsocks executable.")
 
+(defun yeetube-mpv-toggle-torsocks ()
+  "Toggle torsocks."
+  (interactive)
+  (pcase yeetube-mpv-torsocks
+    ('t (setf yeetube-mpv-torsocks nil)
+       (message "yeetube: Torsocks disabled"))
+    ('nil (setf yeetube-mpv-torsocks t)
+	   (message "yeetube: Torsocks enabled"))))
+
 (defun yeetube-mpv-check ()
   "Check if mpv and yt-dlp is installed."
   (unless (and (executable-find "mpv")
