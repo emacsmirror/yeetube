@@ -5,7 +5,7 @@
 ;; Author: Thanos Apollo <public@thanosapollo.org>
 ;; Keywords: extensions youtube videos
 ;; URL: https://git.thanosapollo.org/yeetube
-;; Version: 2.1.0
+;; Version: 2.1.1
 
 
 ;; Package-Requires: ((emacs "27.2") (compat "29.1.4.2"))
@@ -471,6 +471,7 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
   "P" #'yeetube-play-saved-video
   "r" #'yeetube-replay
   "t" #'yeetube-view-thumbnail
+  "T" #'yeetube-mpv-toggle-torsocks
   "q" #'quit-window)
 
 (define-derived-mode yeetube-mode tabulated-list-mode "Yeetube"
