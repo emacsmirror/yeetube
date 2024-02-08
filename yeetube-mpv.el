@@ -37,6 +37,9 @@
 (defvar yeetube-mpv-path (executable-find "mpv")
   "Path for mpv executable.")
 
+(defvar yeetube-mpv-torsocks (executable-find "torsocks")
+  "Path to torsocks executable.")
+
 (defun yeetube-mpv-check ()
   "Check if mpv and yt-dlp is installed."
   (unless (and (executable-find "mpv")
