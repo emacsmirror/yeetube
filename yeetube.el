@@ -264,7 +264,7 @@ This is used to download thumbnails from `yeetube-content', within
 		   nil 0)))))
 
 (defvar yeetube-filter-code-alist
-  '(("Relevance" . "CAASAhAB")
+  '(("Relevance" . "EgIQAQ%253D%253D")
     ("Date" . "CAISAhAB")
     ("Views" . "CAMSAhAB")
     ("Rating" . "CAESAhAB")))
