@@ -7,8 +7,6 @@
 ;; URL: https://git.thanosapollo.org/yeetube
 ;; Version: 2.1.2-dev
 
-
-
 ;; Package-Requires: ((emacs "27.2") (compat "29.1.4.2"))
 
 ;; This program is free software; you can redistribute it and/or modify
