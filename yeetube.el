@@ -268,7 +268,14 @@ This is used to download thumbnails from `yeetube-content', within
   '(("Relevance" . "EgIQAQ%253D%253D")
     ("Date" . "CAISAhAB")
     ("Views" . "CAMSAhAB")
-    ("Rating" . "CAESAhAB")))
+    ("Rating" . "CAESAhAB"))
+  "Filter codes.")
+
+(defvar yeetube-request-headers
+  '(("Accept-Language" . "Accept-Language: en-US,en;q=0.9")
+    ("Accept" . "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8")
+    ("User-Agent" . "Mozilla/5.0 (Windows NT 10.0; rv:122.0) Gecko/20100101 Firefox/122.0"))
+  "HTTP Request extra headers")
 
 (defun yeetube-get-filter-code (filter)
   "Get filter code for sorting search results."
@@ -278,8 +285,7 @@ This is used to download thumbnails from `yeetube-content', within
 (defun yeetube-search (query)
   "Search for QUERY."
   (interactive "sYeetube Search: ")
-  (let ((url-request-extra-headers
-	 '(("Accept-Language" . "Accept-Language: en-US,en;q=0.9"))))
+  (let ((url-request-extra-headers yeetube-request-headers))
     (with-current-buffer
 	(url-retrieve-synchronously
 	 (concat "https://youtube.com/search?q="
