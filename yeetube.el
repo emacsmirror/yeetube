@@ -5,7 +5,8 @@
 ;; Author: Thanos Apollo <public@thanosapollo.org>
 ;; Keywords: extensions youtube videos
 ;; URL: https://git.thanosapollo.org/yeetube
-;; Version: 2.1.1
+;; Version: 2.1.2-dev
+
 
 
 ;; Package-Requires: ((emacs "27.2") (compat "29.1.4.2"))
@@ -277,20 +278,22 @@ This is used to download thumbnails from `yeetube-content', within
 (defun yeetube-search (query)
   "Search for QUERY."
   (interactive "sYeetube Search: ")
-  (with-current-buffer
-      (url-retrieve-synchronously
-       (concat "https://youtube.com/search?q="
-	       (replace-regexp-in-string " " "+" query)
-	       ;; Filter parameter to remove live videos.
-	       "&sp="
-	       (yeetube-get-filter-code yeetube-filter))
-       'silent 'inhibit-cookies 30)
-    (decode-coding-region (point-min) (point-max) 'utf-8)
-    (goto-char (point-min))
-    (toggle-enable-multibyte-characters)
-    (yeetube-get-content))
-    ;; (yeetube-get-thumbnails yeetube-content) ;; download thumbnails
-    ;; unfortunately we can't use images them with tabulated list
+  (let ((url-request-extra-headers
+	 '(("Accept-Language" . "Accept-Language: en-US,en;q=0.9"))))
+    (with-current-buffer
+	(url-retrieve-synchronously
+	 (concat "https://youtube.com/search?q="
+		 (replace-regexp-in-string " " "+" query)
+		 ;; Filter parameter to remove live videos.
+		 "&sp="
+		 (yeetube-get-filter-code yeetube-filter))
+	 'silent 'inhibit-cookies 30)
+      (decode-coding-region (point-min) (point-max) 'utf-8)
+      (goto-char (point-min))
+      (toggle-enable-multibyte-characters)
+      (yeetube-get-content)))
+  ;; (yeetube-get-thumbnails yeetube-content) ;; download thumbnails
+  ;; unfortunately we can't use images them with tabulated list
   (with-current-buffer
       (switch-to-buffer (get-buffer-create (concat "*yeetube*")))
     (yeetube-mode)))
