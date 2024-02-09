@@ -84,11 +84,25 @@ For example:
 
 This will filter & sort the search results according to the number of views.
 
+### Torsocks
 
-### FAQ
-#### Feature request: display thumbnails
-Formatting images in a text buffer is not something that I found easy
-or fun to do. Feel free to submit a patch if you manage to make an
-appealing version of it
+If you are using `yeetube-mpv-play` as your media player & running
+[tor](https://wiki.archlinux.org/title/Tor), you can use torsocks to
+route your traffic via the tor network.
 
+``` emacs-lisp
+(setf yeetube-mpv-enable-torsocks t)
+```
+
+*You can toggle that option with `yeetube-mpv-toggle-torsocks`*
+
+### Video Quality
+
+If you are using `yeetube-mpv-play` as your media player, you can
+specify video quality using `yeetube-mpv-change-video-quality`
+*recommended* or by using this snippet.
+
+``` emacs-lisp
+(setf yeetube-mpv-video-quality "720") ;; Accepted values include: 1080, 720, 480, 360, 240, 144
+```
 
