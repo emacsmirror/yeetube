@@ -45,6 +45,12 @@
 
 Accepted values include: 1080, 720, 480, 360, 240, 144")
 
+(defun yeetube-mpv-change-video-quality ()
+  (interactive)
+  (let ((new-value (completing-read (format "Set video quality (current value %s):" yeetube-mpv-video-quality)
+				    '("1080" "720" "480" "360" "240" "144") nil t)))
+    (setf yeetube-mpv-video-quality new-value)))
+
 (defun yeetube-mpv-toggle-torsocks ()
   "Toggle torsocks."
   (interactive)
