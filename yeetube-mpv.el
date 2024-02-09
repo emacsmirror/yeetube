@@ -40,6 +40,11 @@
 (defvar yeetube-mpv-torsocks (executable-find "torsocks")
   "Path to torsocks executable.")
 
+(defvar yeetube-mpv-video-quality "720"
+  "Video resolution/quality
+
+Accepted values include: 1080, 720, 480, 360, 240, 144")
+
 (defun yeetube-mpv-toggle-torsocks ()
   "Toggle torsocks."
   (interactive)
