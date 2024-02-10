@@ -515,6 +515,19 @@ column."
   (< (string-to-number (replace-regexp-in-string ":" "" (aref (cadr a) 2)))
      (string-to-number (replace-regexp-in-string ":" "" (aref (cadr b) 2)))))
 
+(defun yeetube--sort-date (a b)
+  "PREDICATE for function 'sort'.
+Used by variable 'tabulated-list-format' to sort the \"Date\"
+column."
+  (let* ((intervals '("second" "minute" "hour" "day" "week" "month" "year"))
+         (split-a (split-string (replace-regexp-in-string "s" "" (aref (cadr a) 3))))
+         (split-b (split-string (replace-regexp-in-string "s" "" (aref (cadr b) 3))))
+         (units-a (length (member (nth 1 split-a) intervals)))
+         (units-b (length (member (nth 1 split-b) intervals))))
+    (if (= units-a units-b)
+      (< (string-to-number (nth 0 split-a)) (string-to-number (nth 0 split-b)))
+     (> units-a units-b))))
+
 (define-derived-mode yeetube-mode tabulated-list-mode "Yeetube"
   "Yeetube mode."
   :keymap yeetube-mode-map
