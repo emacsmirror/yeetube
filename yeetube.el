@@ -128,6 +128,11 @@ Valid options include:
   "Face used for video channel name."
   :group 'yeetube-faces)
 
+(defface yeetube-face-date
+  '((t :inherit font-lock-doc-face))
+  "Face used for published date."
+  :group 'yeetube-faces)
+
 (defvar yeetube-invidious-instances
   '("vid.puffyan.us"
     "invidious.flokinet.to"
