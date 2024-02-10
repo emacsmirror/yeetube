@@ -26,4 +26,6 @@ $ git format-patch HEAD^1
 
 
 * Tasks
-** TODO Add sorting for tabulated list views/date/title/duration
+** DONE Add sorting for tabulated list views/date/title/duration
+CLOSED: [2024-02-10 Sat 11:38]
++ With the help of Boruch Baum <boruch_baum@gmx.com>
