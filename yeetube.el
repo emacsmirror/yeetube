@@ -82,7 +82,19 @@ Valid options include:
   :type '(radio (const "Relevance")
 		(const "Date")
 		(const "Views")
-		(const "Rating"))
+		(const "Rating")))
+
+(defcustom yeetube-default-sort-column nil
+  "Which column to sort the search results table."
+  :type '(radio (const "Title")
+                (const "Views")
+                (const "Duration")
+                (const "Channel"))
+  :group 'yeetube)
+
+(defcustom yeetube-default-sort-ascending nil
+  "Whether to sort the search results in ascending order."
+  :type 'boolean
   :group 'yeetube)
 
 (defgroup yeetube-faces nil
@@ -114,6 +126,11 @@ Valid options include:
 (defface yeetube-face-channel
   '((t :inherit font-lock-function-call-face))
   "Face used for video channel name."
+  :group 'yeetube-faces)
+
+(defface yeetube-face-date
+  '((t :inherit font-lock-doc-face))
+  "Face used for published date."
   :group 'yeetube-faces)
 
 (defvar yeetube-invidious-instances
@@ -355,13 +372,15 @@ SUBSTRING-END is the end of the string to return, interger."
 	      (view-count (yeetube-scrape-item :item "viewcounttext" :item-end " " :substring-end 0))
 	      (video-duration (yeetube-scrape-item :item "lengthtext" :item-end "}," :substring-end 3))
 	      (channel (yeetube-scrape-item :item "longbylinetext" :item-end "," :substring-end 2))
-	      (thumbnail (yeetube-scrape-item :item "thumbnail" :item-start "url" :item-end ",\"" :substring-end 5)))
+	      (thumbnail (yeetube-scrape-item :item "thumbnail" :item-start "url" :item-end ",\"" :substring-end 5))
+	      (date (yeetube-scrape-item :item "publishedtimetext" :item-end ",\"" :substring-end 4)))
 	  (push (list :title title
 		      :videoid videoid
 		      :view-count (yeetube-view-count-format view-count)
 		      :duration video-duration
 		      :channel channel
-		      :thumbnail thumbnail)
+		      :thumbnail thumbnail
+		      :date (replace-regexp-in-string "Streamed " "" date))
 		yeetube-content))))))
 
 (add-variable-watcher 'yeetube-saved-videos #'yeetube-update-saved-videos-list)
@@ -482,10 +501,42 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
   "C-q" #'yeetube-mpv-change-video-quality
   "q" #'quit-window)
 
+(defun yeetube--sort-views (a b)
+  "PREDICATE for function 'sort'.
+Used by variable 'tabulated-list-format' to sort the \"Views\"
+column."
+  (< (string-to-number (replace-regexp-in-string "," "" (aref (cadr a) 1)))
+     (string-to-number (replace-regexp-in-string "," "" (aref (cadr b) 1)))))
+
+(defun yeetube--sort-duration (a b)
+  "PREDICATE for function 'sort'.
+Used by variable 'tabulated-list-format' to sort the \"Duration\"
+column."
+  (< (string-to-number (replace-regexp-in-string ":" "" (aref (cadr a) 2)))
+     (string-to-number (replace-regexp-in-string ":" "" (aref (cadr b) 2)))))
+
+(defun yeetube--sort-date (a b)
+  "PREDICATE for function 'sort'.
+Used by variable 'tabulated-list-format' to sort the \"Date\"
+column."
+  (let* ((intervals '("second" "minute" "hour" "day" "week" "month" "year"))
+         (split-a (split-string (replace-regexp-in-string "s" "" (aref (cadr a) 3))))
+         (split-b (split-string (replace-regexp-in-string "s" "" (aref (cadr b) 3))))
+         (units-a (length (member (nth 1 split-a) intervals)))
+         (units-b (length (member (nth 1 split-b) intervals))))
+    (if (= units-a units-b)
+      (< (string-to-number (nth 0 split-a)) (string-to-number (nth 0 split-b)))
+     (> units-a units-b))))
+
 (define-derived-mode yeetube-mode tabulated-list-mode "Yeetube"
   "Yeetube mode."
   :keymap yeetube-mode-map
-  (setf tabulated-list-format [("Title" 60 t) ("Views" 12 t) ("Duration" 12 t) ("Channel" 12 t)]
+  (setf tabulated-list-format
+        [("Title" 60 t)
+         ("Views" 11 yeetube--sort-views)
+         ("Duration" 9 yeetube--sort-duration)
+	 ("Date" 13 yeetube--sort-date)
+         ("Channel" 8 t)]
 	tabulated-list-entries
 	(cl-map 'list
 		(lambda (content)
@@ -494,9 +545,11 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
                                                    :title 'yeetube-face-title
                                                    :view-count 'yeetube-face-view-count
                                                    :duration 'yeetube-face-duration
+						   :date 'yeetube-face-date
                                                    :channel 'yeetube-face-channel)))
 		(reverse yeetube-content))
-	tabulated-list-sort-key nil)
+	tabulated-list-sort-key (cons yeetube-default-sort-column
+                                      yeetube-default-sort-ascending))
   (display-line-numbers-mode 0)
   (tabulated-list-init-header)
   (tabulated-list-print))
