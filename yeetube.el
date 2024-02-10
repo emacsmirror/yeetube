@@ -533,9 +533,10 @@ column."
   :keymap yeetube-mode-map
   (setf tabulated-list-format
         [("Title" 60 t)
-         ("Views" 12 yeetube--sort-views)
+         ("Views" 11 yeetube--sort-views)
          ("Duration" 9 yeetube--sort-duration)
-         ("Channel" 12 t)]
+	 ("Date" 13 yeetube--sort-date)
+         ("Channel" 8 t)]
 	tabulated-list-entries
 	(cl-map 'list
 		(lambda (content)
@@ -544,6 +545,7 @@ column."
                                                    :title 'yeetube-face-title
                                                    :view-count 'yeetube-face-view-count
                                                    :duration 'yeetube-face-duration
+						   :date 'yeetube-face-date
                                                    :channel 'yeetube-face-channel)))
 		(reverse yeetube-content))
 	tabulated-list-sort-key (cons yeetube-default-sort-column
