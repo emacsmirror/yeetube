@@ -82,9 +82,9 @@ Valid options include:
   :type '(radio (const "Relevance")
 		(const "Date")
 		(const "Views")
-		(const "Rating"))
+		(const "Rating")))
 
-(defcustom yeetube-default-sort-column "Title"
+(defcustom yeetube-default-sort-column nil
   "Which column to sort the search results table."
   :type '(radio (const "Title")
                 (const "Views")
