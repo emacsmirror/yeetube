@@ -372,14 +372,15 @@ SUBSTRING-END is the end of the string to return, interger."
 	      (view-count (yeetube-scrape-item :item "viewcounttext" :item-end " " :substring-end 0))
 	      (video-duration (yeetube-scrape-item :item "lengthtext" :item-end "}," :substring-end 3))
 	      (channel (yeetube-scrape-item :item "longbylinetext" :item-end "," :substring-end 2))
-	      (thumbnail (yeetube-scrape-item :item "thumbnail" :item-start "url" :item-end ",\"" :substring-end 5)))
+	      (thumbnail (yeetube-scrape-item :item "thumbnail" :item-start "url" :item-end ",\"" :substring-end 5))
+	      (date (yeetube-scrape-item :item "publishedtimetext" :item-end ",\"" :substring-end 4)))
 	  (push (list :title title
 		      :videoid videoid
 		      :view-count (yeetube-view-count-format view-count)
 		      :duration video-duration
-                      :published-time published-time
 		      :channel channel
-		      :thumbnail thumbnail)
+		      :thumbnail thumbnail
+		      :date (replace-regexp-in-string "Streamed " "" date))
 		yeetube-content))))))
 
 (add-variable-watcher 'yeetube-saved-videos #'yeetube-update-saved-videos-list)
