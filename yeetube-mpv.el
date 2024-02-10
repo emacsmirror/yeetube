@@ -40,6 +40,17 @@
 (defvar yeetube-mpv-torsocks (executable-find "torsocks")
   "Path to torsocks executable.")
 
+(defvar yeetube-mpv-video-quality "720"
+  "Video resolution/quality
+
+Accepted values include: 1080, 720, 480, 360, 240, 144")
+
+(defun yeetube-mpv-change-video-quality ()
+  (interactive)
+  (let ((new-value (completing-read (format "Set video quality (current value %s):" yeetube-mpv-video-quality)
+				    '("1080" "720" "480" "360" "240" "144") nil t)))
+    (setf yeetube-mpv-video-quality new-value)))
+
 (defun yeetube-mpv-toggle-torsocks ()
   "Toggle torsocks."
   (interactive)
@@ -67,6 +78,10 @@
       (start-process-shell-command
        "yeetube" nil command))))
 
+(defun yeetube-mpv-ytdl-format-video-quality (resolution)
+  "Return shell quoted argument for ytdlp with RESOLUTION."
+  (shell-quote-argument (format "bestvideo[height<=?%s]+bestaudio/best" resolution)))
+
 (defun yeetube-mpv-play (input)
   "Start yeetube process to play INPUT using mpv.
 
@@ -75,7 +90,9 @@ to play local files."
   (yeetube-mpv-process
    (concat (when yeetube-mpv-enable-torsocks
 	     (concat yeetube-mpv-torsocks " "))
-	   yeetube-mpv-path " "
+	   yeetube-mpv-path " --ytdl-format="
+	   (yeetube-mpv-ytdl-format-video-quality yeetube-mpv-video-quality)
+	   " "
 	   (shell-quote-argument input)
 	   (when yeetube-mpv-disable-video " --no-video")))
   (message (if yeetube-mpv-enable-torsocks

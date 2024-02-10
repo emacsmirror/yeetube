@@ -1,0 +1,31 @@
+#+title: Contributing | YeeTube
+#+author: Thanos Apollo
+
+
+* Sources
++ [[https://git.thanosapollo.org/yeetube][Upstream]]
+
+* How To Contribute
+
+Before starting to work on any big feature, that is not mentioned on
+the [[Task List][Task List]], I recommend you to send me an email first.
+
+** How to submit a PR?
++ Feel free to send me a patch, here's how to create one
+
+#+begin_src bash
+$ git clone https://git.thanosapollo.com/<repo>.git && cd <repo>
+$ emacs something
+$ git add something
+$ git commit -m "Fix something"
+$ git format-patch HEAD^1
+0001-Fix-something.patch
+#+end_src
+
+/You can find my email on the git log/
+
+
+* Tasks
+** DONE Add sorting for tabulated list views/date/title/duration
+CLOSED: [2024-02-10 Sat 11:38]
++ With the help of Boruch Baum <boruch_baum@gmx.com>
