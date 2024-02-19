@@ -1,4 +1,4 @@
-;;; yeetube.el --- YouTube Front End  -*- lexical-binding: t; -*-
+;;; yeetube.el --- YouTube Front End | Interface for yt-dlp | mpv control |  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2023  Thanos Apollo
 
