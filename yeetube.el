@@ -41,6 +41,7 @@
 (require 'url)
 (require 'tabulated-list)
 (require 'cl-lib)
+(require 'socks)
 (require 'yeetube-mpv)
 
 (defgroup yeetube nil
@@ -94,6 +95,11 @@ Valid options include:
 
 (defcustom yeetube-default-sort-ascending nil
   "Whether to sort the search results in ascending order."
+  :type 'boolean
+  :group 'yeetube)
+
+(defcustom yeetube-enable-tor nil
+  "Enable routing through tor"
   :type 'boolean
   :group 'yeetube)
 
@@ -296,19 +302,26 @@ This is used to download thumbnails from `yeetube-content', within
   "Get filter code for sorting search results."
   (cdr (assoc filter yeetube-filter-code-alist)))
 
+(defmacro yeetube-with-tor-socks (&rest body)
+  `(let ((url-gateway-method 'socks)
+         (socks-noproxy '("localhost"))
+         (socks-server '("Default server" "127.0.0.1" 9050 5)))
+     ,@body))
+
 ;;;###autoload
 (defun yeetube-search (query)
   "Search for QUERY."
   (interactive "sYeetube Search: ")
-  (let ((url-request-extra-headers yeetube-request-headers))
+  (let* ((url-request-extra-headers yeetube-request-headers)
+         (search-url (concat "https://youtube.com/search?q="
+                             (replace-regexp-in-string " " "+" query)
+                             ;; Filter parameter to remove live videos.
+                             "&sp="
+                             (yeetube-get-filter-code yeetube-filter))))
     (with-current-buffer
-	(url-retrieve-synchronously
-	 (concat "https://youtube.com/search?q="
-		 (replace-regexp-in-string " " "+" query)
-		 ;; Filter parameter to remove live videos.
-		 "&sp="
-		 (yeetube-get-filter-code yeetube-filter))
-	 'silent 'inhibit-cookies 30)
+        (if yeetube-enable-tor
+            (yeetube-with-tor-socks (url-retrieve-synchronously search-url 'silent 'inhibit-cookies 30))
+          (url-retrieve-synchronously search-url 'silent 'inhibit-cookies 30))
       (decode-coding-region (point-min) (point-max) 'utf-8)
       (goto-char (point-min))
       (toggle-enable-multibyte-characters)
@@ -421,7 +434,8 @@ Optional values:
   (unless yeetube-ytdlp
     (error "Executable for yt-dlp not found.  Please install yt-dlp"))
   (call-process-shell-command
-   (concat "yt-dlp " (shell-quote-argument url)
+   (concat (when yeetube-enable-tor "torsocks ")
+	   "yt-dlp " (shell-quote-argument url)
 	   (when name
 	     " -o "(shell-quote-argument name))
 	   (when audio-format
