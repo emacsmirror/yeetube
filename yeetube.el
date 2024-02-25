@@ -119,6 +119,11 @@ Valid options include:
   :type 'number
   :group 'yeetube)
 
+(defcustom yeetube-display-thumbnails t
+  "asdf"
+  :type 'boolean
+  :group 'yeetube)
+
 (defface yeetube-face-header-query
   '((t :inherit font-lock-function-name-face))
   "Face used for the video published date."
