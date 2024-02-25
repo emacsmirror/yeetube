@@ -576,7 +576,7 @@ column."
 (defun yeetube-iimage-mode-buffer (arg)
   "Display images if ARG is non-nil, undisplay them otherwise.
 
-Modified version of `iimage-mode-buffer' to specify height & width and
+Modified version of `iimage-mode-buffer' to specify height, width and
 image-path."
   (let ((image-path (list (expand-file-name temporary-file-directory)))
         file)
@@ -609,7 +609,7 @@ image-path."
          ("Views" 11 yeetube--sort-views)
          ("Duration" 9 yeetube--sort-duration)
 	 ("Date" 13 yeetube--sort-date)
-         ("Channel" 10 t)
+         ("Channel" 12 t)
 	 ("Thumbnail" 0 t)]
 	tabulated-list-entries
 	(cl-map 'list
@@ -621,7 +621,7 @@ image-path."
                                                    :duration 'yeetube-face-duration
 						   :date 'yeetube-face-date
                                                    :channel 'yeetube-face-channel
-						   :image 'yeetube-face-thumbnail)))
+						   :image nil)))
 		(reverse yeetube-content))
 	tabulated-list-sort-key (cons yeetube-default-sort-column
                                       yeetube-default-sort-ascending))
