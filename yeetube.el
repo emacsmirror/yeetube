@@ -291,22 +291,23 @@ WHERE indicates where in the buffer the update should happen."
 This is used to download thumbnails from `yeetube-content', within
 `yeetube-search'. We can't as of now use images with tabulated-list."
   (interactive)
-  (let ((wget-exec (executable-find "wget"))
-	(default-directory temporary-file-directory))
-    (unless wget-exec
-      (error "Please install `wget', to download thumbnails"))
-    (cl-loop for item in content
-	     do (let ((thumbnail (plist-get item :thumbnail)))
-		  (call-process-shell-command
-		   (format "%s %s %s %s" wget-exec
-			   (shell-quote-argument thumbnail)
-			   "-O"
-			   (concat (replace-regexp-in-string
-						    "\\(.*\\)\\(\\(.\\{10\\}\\)\\)$"
-						    "\\2"
-						    thumbnail)
-				   ".jpg"))
-		   nil 0)))))
+  (when yeetube-display-thumbnails
+    (let ((wget-exec (executable-find "wget"))
+	  (default-directory temporary-file-directory))
+      (unless wget-exec
+	(error "Please install `wget', to download thumbnails"))
+      (cl-loop for item in content
+	       do (let ((thumbnail (plist-get item :thumbnail)))
+		    (call-process-shell-command
+		     (format "%s %s %s %s" wget-exec
+			     (shell-quote-argument thumbnail)
+			     "-O"
+			     (concat (replace-regexp-in-string
+				      "\\(.*\\)\\(\\(.\\{10\\}\\)\\)$"
+				      "\\2"
+				      thumbnail)
+				     ".jpg"))
+		     nil 0))))))
 
 (defvar yeetube-filter-code-alist
   '(("Relevance" . "EgIQAQ%253D%253D")
