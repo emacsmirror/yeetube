@@ -605,7 +605,8 @@ image-path."
          ("Views" 11 yeetube--sort-views)
          ("Duration" 9 yeetube--sort-duration)
 	 ("Date" 13 yeetube--sort-date)
-         ("Channel" 8 t)]
+         ("Channel" 10 t)
+	 ("Thumbnail" 0 t)]
 	tabulated-list-entries
 	(cl-map 'list
 		(lambda (content)
@@ -615,13 +616,15 @@ image-path."
                                                    :view-count 'yeetube-face-view-count
                                                    :duration 'yeetube-face-duration
 						   :date 'yeetube-face-date
-                                                   :channel 'yeetube-face-channel)))
+                                                   :channel 'yeetube-face-channel
+						   :image 'yeetube-face-thumbnail)))
 		(reverse yeetube-content))
 	tabulated-list-sort-key (cons yeetube-default-sort-column
                                       yeetube-default-sort-ascending))
   (display-line-numbers-mode 0)
   (tabulated-list-init-header)
-  (tabulated-list-print))
+  (tabulated-list-print)
+  (yeetube-iimage-mode-buffer yeetube-display-thumbnails))
 
 (provide 'yeetube)
 ;;; yeetube.el ends here
