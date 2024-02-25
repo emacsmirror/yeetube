@@ -29,3 +29,9 @@ $ git format-patch HEAD^1
 ** DONE Add sorting for tabulated list views/date/title/duration
 CLOSED: [2024-02-10 Sat 11:38]
 + With the help of Boruch Baum <boruch_baum@gmx.com>
+
+** Improve interactivity
++ Sort columns interactively
+
+** Improve torsocks support
++ Use =socks= to route all traffic from =url= to tor, this should be an opt-in feature

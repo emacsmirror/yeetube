@@ -1,11 +1,11 @@
-;;; yeetube.el --- YouTube Front End  -*- lexical-binding: t; -*-
+;;; yeetube.el --- YouTube Front End | Interface for yt-dlp | mpv control |  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2023  Thanos Apollo
 
 ;; Author: Thanos Apollo <public@thanosapollo.org>
 ;; Keywords: extensions youtube videos
 ;; URL: https://thanosapollo.org/projects/yeetube/
-;; Version: 2.1.2
+;; Version: 2.1.3
 
 ;; Package-Requires: ((emacs "27.2") (compat "29.1.4.2"))
 
@@ -41,6 +41,9 @@
 (require 'url)
 (require 'tabulated-list)
 (require 'cl-lib)
+(require 'socks)
+(require 'iimage)
+
 (require 'yeetube-mpv)
 
 (defgroup yeetube nil
@@ -97,11 +100,31 @@ Valid options include:
   :type 'boolean
   :group 'yeetube)
 
+(defcustom yeetube-enable-tor nil
+  "Enable routing through tor"
+  :type 'boolean
+  :group 'yeetube)
+
 (defgroup yeetube-faces nil
   "Faces used by yeetube."
   :group 'yeetube
   :tag "Yeetube Faces"
   :prefix 'yeetube-face)
+
+(defcustom yeetube-thumbnail-height 80
+  "Height of the thumbnail."
+  :type 'number
+  :group 'yeetube)
+
+(defcustom yeetube-thumbnail-width 80
+  "Width of the thumbnail."
+  :type 'number
+  :group 'yeetube)
+
+(defcustom yeetube-display-thumbnails t
+  "asdf"
+  :type 'boolean
+  :group 'yeetube)
 
 (defface yeetube-face-header-query
   '((t :inherit font-lock-function-name-face))
@@ -268,16 +291,23 @@ WHERE indicates where in the buffer the update should happen."
 This is used to download thumbnails from `yeetube-content', within
 `yeetube-search'. We can't as of now use images with tabulated-list."
   (interactive)
-  (let ((wget-exec (executable-find "wget"))
-	(default-directory temporary-file-directory))
-    (unless wget-exec
-      (error "Please install `wget', to download thumbnails"))
-    (cl-loop for item in content
-	     do (let ((title (plist-get item :title))
-		      (thumbnail (plist-get item :thumbnail)))
-		  (call-process-shell-command
-		   (concat "wget " (shell-quote-argument thumbnail) " -O" (shell-quote-argument title))
-		   nil 0)))))
+  (when yeetube-display-thumbnails
+    (let ((wget-exec (executable-find "wget"))
+	  (default-directory temporary-file-directory))
+      (unless wget-exec
+	(error "Please install `wget', to download thumbnails"))
+      (cl-loop for item in content
+	       do (let ((thumbnail (plist-get item :thumbnail)))
+		    (call-process-shell-command
+		     (format "%s %s %s %s" wget-exec
+			     (shell-quote-argument thumbnail)
+			     "-O"
+			     (concat (replace-regexp-in-string
+				      "\\(.*\\)\\(\\(.\\{10\\}\\)\\)$"
+				      "\\2"
+				      thumbnail)
+				     ".jpg"))
+		     nil 0))))))
 
 (defvar yeetube-filter-code-alist
   '(("Relevance" . "EgIQAQ%253D%253D")
@@ -296,27 +326,34 @@ This is used to download thumbnails from `yeetube-content', within
   "Get filter code for sorting search results."
   (cdr (assoc filter yeetube-filter-code-alist)))
 
+(defmacro yeetube-with-tor-socks (&rest body)
+  `(let ((url-gateway-method 'socks)
+         (socks-noproxy '("localhost"))
+         (socks-server '("Default server" "127.0.0.1" 9050 5)))
+     ,@body))
+
 ;;;###autoload
 (defun yeetube-search (query)
   "Search for QUERY."
   (interactive "sYeetube Search: ")
-  (let ((url-request-extra-headers yeetube-request-headers))
+  (let* ((url-request-extra-headers yeetube-request-headers)
+         (search-url (concat "https://youtube.com/search?q="
+                             (replace-regexp-in-string " " "+" query)
+                             ;; Filter parameter to remove live videos.
+                             "&sp="
+                             (yeetube-get-filter-code yeetube-filter))))
     (with-current-buffer
-	(url-retrieve-synchronously
-	 (concat "https://youtube.com/search?q="
-		 (replace-regexp-in-string " " "+" query)
-		 ;; Filter parameter to remove live videos.
-		 "&sp="
-		 (yeetube-get-filter-code yeetube-filter))
-	 'silent 'inhibit-cookies 30)
+        (if yeetube-enable-tor
+            (yeetube-with-tor-socks (url-retrieve-synchronously search-url 'silent 'inhibit-cookies 30))
+          (url-retrieve-synchronously search-url 'silent 'inhibit-cookies 30))
       (decode-coding-region (point-min) (point-max) 'utf-8)
       (goto-char (point-min))
       (toggle-enable-multibyte-characters)
-      (yeetube-get-content)))
-  ;; (yeetube-get-thumbnails yeetube-content) ;; download thumbnails
+      (yeetube-get-content))
+    (yeetube-get-thumbnails yeetube-content)) ;; download thumbnails
   ;; unfortunately we can't use images them with tabulated list
   (with-current-buffer
-      (switch-to-buffer (get-buffer-create (concat "*yeetube*")))
+      (pop-to-buffer-same-window "*yeetube*")
     (yeetube-mode)))
 
 ;;;###autoload
@@ -380,7 +417,15 @@ SUBSTRING-END is the end of the string to return, interger."
 		      :duration video-duration
 		      :channel channel
 		      :thumbnail thumbnail
-		      :date (replace-regexp-in-string "Streamed " "" date))
+		      :date (replace-regexp-in-string "Streamed " "" date)
+		      :image (if yeetube-display-thumbnails
+				 (format "[[%s.jpg]]" (expand-file-name
+						   (replace-regexp-in-string
+						    "\\(.*\\)\\(\\(.\\{10\\}\\)\\)$"
+						    "\\2"
+						    thumbnail)
+						   temporary-file-directory))
+				 "nil"))
 		yeetube-content))))))
 
 (add-variable-watcher 'yeetube-saved-videos #'yeetube-update-saved-videos-list)
@@ -421,7 +466,8 @@ Optional values:
   (unless yeetube-ytdlp
     (error "Executable for yt-dlp not found.  Please install yt-dlp"))
   (call-process-shell-command
-   (concat "yt-dlp " (shell-quote-argument url)
+   (concat (when yeetube-enable-tor "torsocks ")
+	   "yt-dlp " (shell-quote-argument url)
 	   (when name
 	     " -o "(shell-quote-argument name))
 	   (when audio-format
@@ -526,7 +572,35 @@ column."
          (units-b (length (member (nth 1 split-b) intervals))))
     (if (= units-a units-b)
       (< (string-to-number (nth 0 split-a)) (string-to-number (nth 0 split-b)))
-     (> units-a units-b))))
+      (> units-a units-b))))
+
+(defun yeetube-iimage-mode-buffer (arg)
+  "Display images if ARG is non-nil, undisplay them otherwise.
+
+Modified version of `iimage-mode-buffer' to specify height, width and
+image-path."
+  (let ((image-path (list (expand-file-name temporary-file-directory)))
+        file)
+    (with-silent-modifications
+      (save-excursion
+        (cl-loop for pair in iimage-mode-image-regex-alist do
+                 (goto-char (point-min))
+                 (while (re-search-forward (car pair) nil t)
+                   (when (and (setq file (match-string (cdr pair)))
+                              (setq file (locate-file file image-path)))
+                     (if arg
+                         (add-text-properties
+                          (match-beginning 0) (match-end 0)
+                          `(display
+                            ,(create-image file nil nil
+                                           :max-width yeetube-thumbnail-width
+					   :max-height yeetube-thumbnail-height)
+                            keymap ,image-map
+                            modification-hooks
+                            (iimage-modification-hook)))
+                       (remove-list-of-text-properties
+                        (match-beginning 0) (match-end 0)
+                        '(display modification-hooks))))))))))
 
 (define-derived-mode yeetube-mode tabulated-list-mode "Yeetube"
   "Yeetube mode."
@@ -536,7 +610,8 @@ column."
          ("Views" 11 yeetube--sort-views)
          ("Duration" 9 yeetube--sort-duration)
 	 ("Date" 13 yeetube--sort-date)
-         ("Channel" 8 t)]
+         ("Channel" 12 t)
+	 ("Thumbnail" 0 t)]
 	tabulated-list-entries
 	(cl-map 'list
 		(lambda (content)
@@ -546,13 +621,15 @@ column."
                                                    :view-count 'yeetube-face-view-count
                                                    :duration 'yeetube-face-duration
 						   :date 'yeetube-face-date
-                                                   :channel 'yeetube-face-channel)))
+                                                   :channel 'yeetube-face-channel
+						   :image nil)))
 		(reverse yeetube-content))
 	tabulated-list-sort-key (cons yeetube-default-sort-column
                                       yeetube-default-sort-ascending))
   (display-line-numbers-mode 0)
   (tabulated-list-init-header)
-  (tabulated-list-print))
+  (tabulated-list-print)
+  (yeetube-iimage-mode-buffer yeetube-display-thumbnails))
 
 (provide 'yeetube)
 ;;; yeetube.el ends here
