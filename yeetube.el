@@ -294,10 +294,16 @@ This is used to download thumbnails from `yeetube-content', within
     (unless wget-exec
       (error "Please install `wget', to download thumbnails"))
     (cl-loop for item in content
-	     do (let ((title (plist-get item :title))
-		      (thumbnail (plist-get item :thumbnail)))
+	     do (let ((thumbnail (plist-get item :thumbnail)))
 		  (call-process-shell-command
-		   (concat "wget " (shell-quote-argument thumbnail) " -O" (shell-quote-argument title))
+		   (format "%s %s %s %s" wget-exec
+			   (shell-quote-argument thumbnail)
+			   "-O"
+			   (concat (replace-regexp-in-string
+						    "\\(.*\\)\\(\\(.\\{10\\}\\)\\)$"
+						    "\\2"
+						    thumbnail)
+				   ".jpg"))
 		   nil 0)))))
 
 (defvar yeetube-filter-code-alist
