@@ -109,6 +109,11 @@ Valid options include:
   :tag "Yeetube Faces"
   :prefix 'yeetube-face)
 
+(defcustom yeetube-thumbnail-height 80
+  "Height of the thumbnail."
+  :type 'number
+  :group 'yeetube)
+
 (defface yeetube-face-header-query
   '((t :inherit font-lock-function-name-face))
   "Face used for the video published date."
