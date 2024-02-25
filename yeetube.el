@@ -297,16 +297,13 @@ This is used to download thumbnails from `yeetube-content', within
       (unless wget-exec
 	(error "Please install `wget', to download thumbnails"))
       (cl-loop for item in content
-	       do (let ((thumbnail (plist-get item :thumbnail)))
+	       do (let ((thumbnail (plist-get item :thumbnail))
+			(videoid (plist-get item :videoid)))
 		    (call-process-shell-command
-		     (format "%s %s %s %s" wget-exec
+		     (format "%s %s %s %s.jpg" wget-exec
 			     (shell-quote-argument thumbnail)
 			     "-O"
-			     (concat (replace-regexp-in-string
-				      "\\(.*\\)\\(\\(.\\{10\\}\\)\\)$"
-				      "\\2"
-				      thumbnail)
-				     ".jpg"))
+			     videoid)
 		     nil 0))))))
 
 (defvar yeetube-filter-code-alist
@@ -409,21 +406,18 @@ SUBSTRING-END is the end of the string to return, interger."
 	      (view-count (yeetube-scrape-item :item "viewcounttext" :item-end " " :substring-end 0))
 	      (video-duration (yeetube-scrape-item :item "lengthtext" :item-end "}," :substring-end 3))
 	      (channel (yeetube-scrape-item :item "longbylinetext" :item-end "," :substring-end 2))
-	      (thumbnail (yeetube-scrape-item :item "thumbnail" :item-start "url" :item-end ",\"" :substring-end 5))
+	      (thumbnail (yeetube-scrape-item :item "thumbnail" :item-start "url" :item-end ".jpg" :substring-end 0))
 	      (date (yeetube-scrape-item :item "publishedtimetext" :item-end ",\"" :substring-end 4)))
 	  (push (list :title title
 		      :videoid videoid
 		      :view-count (yeetube-view-count-format view-count)
 		      :duration video-duration
 		      :channel channel
-		      :thumbnail thumbnail
+		      :thumbnail (replace-regexp-in-string "hq720" "default" thumbnail)
 		      :date (replace-regexp-in-string "Streamed " "" date)
 		      :image (if yeetube-display-thumbnails
 				 (format "[[%s.jpg]]" (expand-file-name
-						   (replace-regexp-in-string
-						    "\\(.*\\)\\(\\(.\\{10\\}\\)\\)$"
-						    "\\2"
-						    thumbnail)
+						   videoid
 						   temporary-file-directory))
 				 "nil"))
 		yeetube-content))))))
@@ -574,34 +568,6 @@ column."
       (< (string-to-number (nth 0 split-a)) (string-to-number (nth 0 split-b)))
       (> units-a units-b))))
 
-(defun yeetube-iimage-mode-buffer (arg)
-  "Display images if ARG is non-nil, undisplay them otherwise.
-
-Modified version of `iimage-mode-buffer' to specify height, width and
-image-path."
-  (let ((image-path (list (expand-file-name temporary-file-directory)))
-        file)
-    (with-silent-modifications
-      (save-excursion
-        (cl-loop for pair in iimage-mode-image-regex-alist do
-                 (goto-char (point-min))
-                 (while (re-search-forward (car pair) nil t)
-                   (when (and (setq file (match-string (cdr pair)))
-                              (setq file (locate-file file image-path)))
-                     (if arg
-                         (add-text-properties
-                          (match-beginning 0) (match-end 0)
-                          `(display
-                            ,(create-image file nil nil
-                                           :max-width yeetube-thumbnail-width
-					   :max-height yeetube-thumbnail-height)
-                            keymap ,image-map
-                            modification-hooks
-                            (iimage-modification-hook)))
-                       (remove-list-of-text-properties
-                        (match-beginning 0) (match-end 0)
-                        '(display modification-hooks))))))))))
-
 (define-derived-mode yeetube-mode tabulated-list-mode "Yeetube"
   "Yeetube mode."
   :keymap yeetube-mode-map
@@ -629,7 +595,7 @@ image-path."
   (display-line-numbers-mode 0)
   (tabulated-list-init-header)
   (tabulated-list-print)
-  (yeetube-iimage-mode-buffer yeetube-display-thumbnails))
+  (iimage-mode t))
 
 (provide 'yeetube)
 ;;; yeetube.el ends here
