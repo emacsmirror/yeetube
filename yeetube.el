@@ -114,6 +114,11 @@ Valid options include:
   :type 'number
   :group 'yeetube)
 
+(defcustom yeetube-thumbnail-width 80
+  "Width of the thumbnail."
+  :type 'number
+  :group 'yeetube)
+
 (defface yeetube-face-header-query
   '((t :inherit font-lock-function-name-face))
   "Face used for the video published date."
