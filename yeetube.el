@@ -567,7 +567,35 @@ column."
          (units-b (length (member (nth 1 split-b) intervals))))
     (if (= units-a units-b)
       (< (string-to-number (nth 0 split-a)) (string-to-number (nth 0 split-b)))
-     (> units-a units-b))))
+      (> units-a units-b))))
+
+(defun yeetube-iimage-mode-buffer (arg)
+  "Display images if ARG is non-nil, undisplay them otherwise.
+
+Modified version of `iimage-mode-buffer' to specify height & width and
+image-path."
+  (let ((image-path (list (expand-file-name temporary-file-directory)))
+        file)
+    (with-silent-modifications
+      (save-excursion
+        (cl-loop for pair in iimage-mode-image-regex-alist do
+                 (goto-char (point-min))
+                 (while (re-search-forward (car pair) nil t)
+                   (when (and (setq file (match-string (cdr pair)))
+                              (setq file (locate-file file image-path)))
+                     (if arg
+                         (add-text-properties
+                          (match-beginning 0) (match-end 0)
+                          `(display
+                            ,(create-image file nil nil
+                                           :max-width yeetube-thumbnail-width
+					   :max-height yeetube-thumbnail-height)
+                            keymap ,image-map
+                            modification-hooks
+                            (iimage-modification-hook)))
+                       (remove-list-of-text-properties
+                        (match-beginning 0) (match-end 0)
+                        '(display modification-hooks))))))))))
 
 (define-derived-mode yeetube-mode tabulated-list-mode "Yeetube"
   "Yeetube mode."
