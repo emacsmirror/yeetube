@@ -346,11 +346,11 @@ This is used to download thumbnails from `yeetube-content', within
       (decode-coding-region (point-min) (point-max) 'utf-8)
       (goto-char (point-min))
       (toggle-enable-multibyte-characters)
-      (yeetube-get-content)))
-  ;; (yeetube-get-thumbnails yeetube-content) ;; download thumbnails
+      (yeetube-get-content))
+    (yeetube-get-thumbnails yeetube-content)) ;; download thumbnails
   ;; unfortunately we can't use images them with tabulated list
   (with-current-buffer
-      (switch-to-buffer (get-buffer-create (concat "*yeetube*")))
+      (pop-to-buffer-same-window "*yeetube*")
     (yeetube-mode)))
 
 ;;;###autoload
