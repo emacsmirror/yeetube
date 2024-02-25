@@ -417,12 +417,14 @@ SUBSTRING-END is the end of the string to return, interger."
 		      :channel channel
 		      :thumbnail thumbnail
 		      :date (replace-regexp-in-string "Streamed " "" date)
-		      :image (format "[[%s.jpg]]" (expand-file-name
+		      :image (if yeetube-display-thumbnails
+				 (format "[[%s.jpg]]" (expand-file-name
 						   (replace-regexp-in-string
 						    "\\(.*\\)\\(\\(.\\{10\\}\\)\\)$"
 						    "\\2"
 						    thumbnail)
-						   temporary-file-directory)))
+						   temporary-file-directory))
+				 "nil"))
 		yeetube-content))))))
 
 (add-variable-watcher 'yeetube-saved-videos #'yeetube-update-saved-videos-list)
