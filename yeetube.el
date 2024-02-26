@@ -121,8 +121,12 @@ Valid options include:
   :type 'number
   :group 'yeetube)
 
-(defcustom yeetube-display-thumbnails t
-  "asdf"
+(defcustom yeetube-display-thumbnails nil
+  "When t, fetch & display thumbnails.
+
+Disabled by default, still an experimental feature that a user should
+opt-in. Note that when enabled the thumbnail images will be downloaded
+on `temporary-file-directory'."
   :type 'boolean
   :group 'yeetube)
 
@@ -177,7 +181,9 @@ Valid options include:
 (defvar yeetube-url "https://youtube.com/watch?v="
   "URL used to play videos from.
 
-You can change the value to an invidious instance.")
+You can change this value to an invidious instance. Although yeetube
+will still query youtube, `yeetube-play' will use the above url to play
+videos from.")
 
 (defun yeetube-get (keyword)
   "Retrieve KEYWORD value for entry at point.
@@ -348,7 +354,6 @@ This is used to download thumbnails from `yeetube-content', within
       (toggle-enable-multibyte-characters)
       (yeetube-get-content))
     (yeetube-get-thumbnails yeetube-content)) ;; download thumbnails
-  ;; unfortunately we can't use images them with tabulated list
   (with-current-buffer
       (pop-to-buffer-same-window "*yeetube*")
     (yeetube-mode)))
@@ -419,7 +424,7 @@ SUBSTRING-END is the end of the string to return, interger."
 				 (format "[[%s.jpg]]" (expand-file-name
 						   videoid
 						   temporary-file-directory))
-				 "nil"))
+				 "disabled"))
 		yeetube-content))))))
 
 (add-variable-watcher 'yeetube-saved-videos #'yeetube-update-saved-videos-list)
