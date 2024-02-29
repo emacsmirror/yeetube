@@ -56,7 +56,7 @@
   :type 'number
   :group 'yeetube)
 
-(defcustom yeetube-player #'yeetube-mpv-play
+(defcustom yeetube-play-function #'yeetube-mpv-play
   "Select media player function."
   :type 'function
   :group 'yeetube)
@@ -212,7 +212,7 @@ Keywords:
   (interactive)
   (let ((video-url (yeetube-get-url))
 	(video-title (yeetube-get :title)))
-    (funcall yeetube-player video-url)
+    (funcall yeetube-play-function video-url)
     (push (list :url video-url :title video-title) yeetube-history)
     (message "Playing: %s" video-title)))
 
@@ -226,7 +226,7 @@ Select entry title from yeetube-history and play corresponding URL."
          (selected (completing-read "Replay: " titles))
          (selected-entry (cl-find-if (lambda (entry) (string= selected (cl-getf entry :title))) yeetube-history))
          (url (cl-getf selected-entry :url)))
-    (funcall yeetube-player url)
+    (funcall yeetube-play-function url)
     (message "Replaying: %s" selected)))
 
 (defun yeetube-load-saved-videos ()
@@ -257,7 +257,7 @@ Select entry title from yeetube-history and play corresponding URL."
   (interactive)
   (yeetube-load-saved-videos)
   (let ((video (completing-read "Select video: " yeetube-saved-videos nil t)))
-    (funcall yeetube-player (cdr (assoc video yeetube-saved-videos)))
+    (funcall yeetube-play-function (cdr (assoc video yeetube-saved-videos)))
     (message "Playing: %s" (car (assoc video yeetube-saved-videos)))))
 
 ;;;###autoload
