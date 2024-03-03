@@ -62,12 +62,16 @@
   :group 'yeetube)
 
 (defcustom yeetube-download-audio-format nil
-  "Select download video as audio FORMAT.
-If nil download output will be the default format.
-
-Example Usage:
- (setf yeetube-download-audio-format \"m4a\")"
-  :type 'string
+  "Specify the preferred audio FORMAT for audio only downloads."
+  :type '(choice (const :tag "Default" nil)
+                 (const :tag "AAC" "aac")
+                 (const :tag "ALAC" "alac")
+                 (const :tag "FLAC" "flac")
+                 (const :tag "M4A" "m4a")
+                 (const :tag "MP3" "mp3")
+                 (const :tag "OPUS" "opus")
+                 (const :tag "Vorbis" "vorbis")
+                 (const :tag "WAV" "wav"))
   :group 'yeetube)
 
 (defcustom yeetube-download-directory "~/Downloads"
