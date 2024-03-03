@@ -462,28 +462,19 @@ SUBSTRING-END is the end of the string to return, interger."
 Optional values:
  NAME for custom file name.
  AUDIO-FORMAT to extract and keep contents as specified audio-format only."
-  (unless yeetube-ytdlp
-    (error "Executable for yt-dlp not found.  Please install yt-dlp"))
-  (call-process-shell-command
-   (concat (when yeetube-enable-tor "torsocks ")
-	   "yt-dlp " (shell-quote-argument url)
-	   (when name
-	     " -o "(shell-quote-argument name))
-	   (when audio-format
-	     " --extract-audio --audio-format " (shell-quote-argument audio-format)))
-   nil 0))
-
-(defun yeetube-download--ffmpeg (url name)
-  "Download URL as NAME using ffmpeg."
-  (let ((ffmpeg (executable-find "ffmpeg")))
-    (unless ffmpeg
-      (error "Executable ffmpeg not found.  Please install ffmpeg"))
-    (call-process-shell-command
-     (concat ffmpeg
-	     " -protocol_whitelist file,crypto,data,https,tls,tcp -stats -i "
-	     (shell-quote-argument url)
-	     " -codec copy "
-	     name))))
+  (unless (executable-find "yt-dlp")
+    (error "Executable for yt-dlp not found. Please install yt-dlp"))
+  (let* ((tor-command (when yeetube-enable-tor (executable-find "torsocks")))
+         (name-command (when name (format "-o %s" (shell-quote-argument name))))
+         (format-command (when audio-format
+			   (format "--extract-audio --audio-format %s" (shell-quote-argument audio-format))))
+         (command (mapconcat 'identity (delq nil
+					     (list tor-command
+						   (executable-find "yt-dlp")
+						   (shell-quote-argument url)
+						   name-command format-command))
+			     " ")))
+    (call-process-shell-command command nil 0)))
 
 ;;;###autoload
 (defun yeetube-download-video ()
