@@ -1,4 +1,4 @@
-;;; yeetube.el --- YouTube Front End | Interface for yt-dlp | mpv control |  -*- lexical-binding: t; -*-
+;;; yeetube.el --- Scrape YouTube - Control MPV - Download content with yt-dlp |  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2023  Thanos Apollo
 
@@ -25,15 +25,15 @@
 ;;; Commentary:
 
 ;; This package provides the ability to scrape YouTube, with the results
-;; displayed in a proced-like buffer.
+;; displayed in a tabulated list.
 ;;
-;; Basic functionality includes:
+;; Core features include:
 ;;
-;; - Query YouTube
-;; - Play video url by default using mpv
-;; - Bookmark/Save video url
+;; - Executing queries on YouTube
+;; - Playing video URLs using default mpv
+;; - Bookmark/Save video url for future reference
 ;; - Download video using yt-dlp
-;; - A minimal yt-dlp front-end, which is independent of the rest YouTube functionality, to download multiple urls.
+;; - A standalone, minimalist yt-dlp frontend
 
 ;;; Code:
 
