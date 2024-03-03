@@ -47,7 +47,7 @@
 (require 'yeetube-mpv)
 
 (defgroup yeetube nil
-  "Youtube Front-end."
+  "Youtube Front-End."
   :group 'external
   :prefix "yeetube-")
 
@@ -62,16 +62,16 @@
   :group 'yeetube)
 
 (defcustom yeetube-download-audio-format nil
-  "Specify the preferred audio FORMAT for audio only downloads."
-  :type '(choice (const :tag "Default" nil)
-                 (const :tag "AAC" "aac")
-                 (const :tag "ALAC" "alac")
-                 (const :tag "FLAC" "flac")
-                 (const :tag "M4A" "m4a")
-                 (const :tag "MP3" "mp3")
-                 (const :tag "OPUS" "opus")
-                 (const :tag "Vorbis" "vorbis")
-                 (const :tag "WAV" "wav"))
+  "Download videos as specified audio only formats."
+  :type '(radio (const :tag "None" nil)
+		(const :tag "AAC" "aac")
+		(const :tag "ALAC" "alac")
+		(const :tag "FLAC" "flac")
+		(const :tag "M4A" "m4a")
+		(const :tag "MP3" "mp3")
+		(const :tag "OPUS" "opus")
+		(const :tag "Vorbis" "vorbis")
+		(const :tag "WAV" "wav"))
   :group 'yeetube)
 
 (defcustom yeetube-download-directory "~/Downloads"
@@ -80,7 +80,7 @@
   :group 'yeetube)
 
 (defcustom yeetube-filter "Relevance"
-  "Sorty search results for value.
+  "Sort search results for value.
 Valid options include:
 - \"Relevance\"
 - \"Date\"
@@ -92,8 +92,9 @@ Valid options include:
 		(const "Rating")))
 
 (defcustom yeetube-default-sort-column nil
-  "Which column to sort the search results table."
-  :type '(radio (const "Title")
+  "Column to sort the search results table."
+  :type '(radio (const :tag "None" nil)
+		(const "Title")
                 (const "Views")
                 (const "Duration")
                 (const "Channel"))
