@@ -116,14 +116,9 @@ Valid options include:
   :tag "Yeetube Faces"
   :prefix 'yeetube-face)
 
-(defcustom yeetube-thumbnail-height 80
-  "Height of the thumbnail."
-  :type 'number
-  :group 'yeetube)
-
-(defcustom yeetube-thumbnail-width 80
-  "Width of the thumbnail."
-  :type 'number
+(defcustom yeetube-thumbnail-size '(90 . 90)
+  "Thumbnail size (height width)."
+  :type '(cons integer integer)
   :group 'yeetube)
 
 (defcustom yeetube-display-thumbnails nil
