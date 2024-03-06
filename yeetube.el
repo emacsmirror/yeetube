@@ -121,7 +121,7 @@ Valid options include:
   :type '(cons integer integer)
   :group 'yeetube)
 
-(defcustom yeetube-display-thumbnails nil
+(defcustom yeetube-display-thumbnails t
   "When t, fetch & display thumbnails.
 
 Disabled by default, still an experimental feature that a user should
