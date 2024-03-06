@@ -106,7 +106,7 @@ Valid options include:
   :group 'yeetube)
 
 (defcustom yeetube-enable-tor nil
-  "Enable routing through tor"
+  "Enable routing through tor."
   :type 'boolean
   :group 'yeetube)
 
@@ -125,7 +125,7 @@ Valid options include:
   "When t, fetch & display thumbnails.
 
 Disabled by default, still an experimental feature that a user should
-opt-in. Note that when enabled the thumbnail images will be downloaded
+opt-in.  Note that when enabled the thumbnail images will be downloaded
 on `temporary-file-directory'."
   :type 'boolean
   :group 'yeetube)
@@ -181,7 +181,7 @@ on `temporary-file-directory'."
 (defvar yeetube-url "https://youtube.com/watch?v="
   "URL used to play videos from.
 
-You can change this value to an invidious instance. Although yeetube
+You can change this value to an invidious instance.  Although yeetube
 will still query youtube, `yeetube-play' will use the above url to play
 videos from.")
 
@@ -331,13 +331,14 @@ This is used to download thumbnails from `yeetube-content'."
   '(("Accept-Language" . "Accept-Language: en-US,en;q=0.9")
     ("Accept" . "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8")
     ("User-Agent" . "Mozilla/5.0 (Windows NT 10.0; rv:122.0) Gecko/20100101 Firefox/122.0"))
-  "HTTP Request extra headers")
+  "HTTP Request extra headers.")
 
 (defun yeetube-get-filter-code (filter)
-  "Get filter code for sorting search results."
+  "Get FILTER code for sorting search results."
   (cdr (assoc filter yeetube-filter-code-alist)))
 
 (defmacro yeetube-with-tor-socks (&rest body)
+  "Execute BODY with torsocks."
   `(let ((url-gateway-method 'socks)
          (socks-noproxy '("localhost"))
          (socks-server '("Default server" "127.0.0.1" 9050 5)))
@@ -471,7 +472,7 @@ Optional values:
  NAME for custom file name.
  AUDIO-FORMAT to extract and keep contents as specified audio-format only."
   (unless (executable-find "yt-dlp")
-    (error "Executable for yt-dlp not found. Please install yt-dlp"))
+    (error "Executable for yt-dlp not found.  Please install yt-dlp"))
   (let* ((tor-command (when yeetube-enable-tor (executable-find "torsocks")))
          (name-command (when name (format "-o %s" (shell-quote-argument name))))
          (format-command (when audio-format
@@ -546,23 +547,32 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
   "q" #'quit-window)
 
 (defun yeetube--sort-views (a b)
-  "PREDICATE for function 'sort'.
-Used by variable 'tabulated-list-format' to sort the \"Views\"
-column."
+  "PREDICATE for function `sort'.
+
+Used by `tabulated-list-format' to sort the \"Views\"
+column.
+
+A and B are vectors."
   (< (string-to-number (replace-regexp-in-string "," "" (aref (cadr a) 1)))
      (string-to-number (replace-regexp-in-string "," "" (aref (cadr b) 1)))))
 
 (defun yeetube--sort-duration (a b)
-  "PREDICATE for function 'sort'.
-Used by variable 'tabulated-list-format' to sort the \"Duration\"
-column."
+  "PREDICATE for function `sort'.
+
+Used by `tabulated-list-format' to sort the \"Duration\"
+column.
+
+A and B are vectors."
   (< (string-to-number (replace-regexp-in-string ":" "" (aref (cadr a) 2)))
      (string-to-number (replace-regexp-in-string ":" "" (aref (cadr b) 2)))))
 
 (defun yeetube--sort-date (a b)
-  "PREDICATE for function 'sort'.
-Used by variable 'tabulated-list-format' to sort the \"Date\"
-column."
+  "PREDICATE for function `sort'.
+
+Used by variable `tabulated-list-format' to sort the \"Date\"
+column.
+
+A and B are vectors."
   (let* ((intervals '("second" "minute" "hour" "day" "week" "month" "year"))
          (split-a (split-string (replace-regexp-in-string "s" "" (aref (cadr a) 3))))
          (split-b (split-string (replace-regexp-in-string "s" "" (aref (cadr b) 3))))
