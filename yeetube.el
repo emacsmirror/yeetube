@@ -1,6 +1,6 @@
-;;; yeetube.el --- Scrape YouTube - Control MPV - Download content with yt-dlp |  -*- lexical-binding: t; -*-
+;;; yeetube.el --- Scrape YouTube - Play with mpv & Download with yt-dlp |  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2023  Thanos Apollo
+;; Copyright (C) 2023-2024  Thanos Apollo
 
 ;; Author: Thanos Apollo <public@thanosapollo.org>
 ;; Keywords: extensions youtube videos
