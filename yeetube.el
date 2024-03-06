@@ -572,6 +572,29 @@ column."
       (< (string-to-number (nth 0 split-a)) (string-to-number (nth 0 split-b)))
       (> units-a units-b))))
 
+;; Modified from iimage.el for hardcoded width/height
+(defun yeetube-iimage-mode-buffer (arg)
+  "Display images if ARG is non-nil, undisplay them otherwise."
+  (let ((image-path (cons default-directory iimage-mode-image-search-path))
+	file)
+    (with-silent-modifications
+      (save-excursion
+        (dolist (pair iimage-mode-image-regex-alist)
+          (goto-char (point-min))
+          (while (re-search-forward (car pair) nil t)
+            (when (and (setq file (match-string (cdr pair)))
+                       (setq file (locate-file file image-path)))
+              (if arg
+                  (add-text-properties
+                   (match-beginning 0) (match-end 0)
+                   `(display
+                     ,(create-image file nil nil
+                                    :max-width (car yeetube-thumbnail-size)
+				    :max-height (cdr yeetube-thumbnail-size)))
+                (remove-list-of-text-properties
+                 (match-beginning 0) (match-end 0)
+                 '(display modification-hooks)))))))))))
+
 (define-derived-mode yeetube-mode tabulated-list-mode "Yeetube"
   "Yeetube mode."
   :keymap yeetube-mode-map
@@ -599,7 +622,7 @@ column."
   (display-line-numbers-mode 0)
   (tabulated-list-init-header)
   (tabulated-list-print)
-  (iimage-mode t))
+  (yeetube-iimage-mode-buffer t))
 
 (provide 'yeetube)
 ;;; yeetube.el ends here
