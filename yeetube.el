@@ -74,7 +74,7 @@
 		(const :tag "WAV" "wav"))
   :group 'yeetube)
 
-(defcustom yeetube-download-directory "~/Downloads"
+(defcustom yeetube-download-directory (expand-file-name "Downloads" "~")
   "Default directory to downlaod videos."
   :type 'string
   :group 'yeetube)
