@@ -290,27 +290,35 @@ WHERE indicates where in the buffer the update should happen."
 		    (save-buffer)
 		    (kill-buffer)))
 
-;; TODO: Find a way to display thumbnails in tabulated list
+(defun yeetube--wget-thumbnail (torsocks url &optional output)
+  "Get thumbnail using `wget' from URL.
+
+If TORSOCKS is non-nil, use torsocks to download URL.
+URL is the URL to download.
+OUTPUT is the output file name."
+  (let ((wget-exec (executable-find "wget")))
+    (unless wget-exec
+      (error "Please install `wget' to download videos"))
+    (let ((command (if torsocks
+		       (format "%s %s %s -O %s.jpg" (executable-find "torsocks") wget-exec
+			       (shell-quote-argument url) (shell-quote-argument output))
+		     (format "%s %s -O %s.jpg" wget-exec (shell-quote-argument url)
+			     (shell-quote-argument output)))))
+      (call-process-shell-command command nil 0))))
+
+
 (cl-defun yeetube-get-thumbnails (content)
   "Download thumbnails for CONTENT using `wget'.
 
-This is used to download thumbnails from `yeetube-content', within
-`yeetube-search'. We can't as of now use images with tabulated-list."
+This is used to download thumbnails from `yeetube-content'."
   (interactive)
   (when yeetube-display-thumbnails
-    (let ((wget-exec (executable-find "wget"))
-	  (default-directory temporary-file-directory))
-      (unless wget-exec
-	(error "Please install `wget', to download thumbnails"))
+    (let ((default-directory temporary-file-directory))
       (cl-loop for item in content
 	       do (let ((thumbnail (plist-get item :thumbnail))
 			(videoid (plist-get item :videoid)))
-		    (call-process-shell-command
-		     (format "%s %s %s %s.jpg" wget-exec
-			     (shell-quote-argument thumbnail)
-			     "-O"
-			     videoid)
-		     nil 0))))))
+		    (unless (file-exists-p (expand-file-name (concat videoid ".jpg")))
+		      (yeetube--wget-thumbnail yeetube-enable-tor thumbnail videoid)))))))
 
 (defvar yeetube-filter-code-alist
   '(("Relevance" . "EgIQAQ%253D%253D")
