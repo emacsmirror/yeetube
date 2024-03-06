@@ -363,9 +363,8 @@ This is used to download thumbnails from `yeetube-content'."
       (toggle-enable-multibyte-characters)
       (yeetube-get-content))
     (yeetube-get-thumbnails yeetube-content)) ;; download thumbnails
-  (with-current-buffer
-      (pop-to-buffer-same-window "*yeetube*")
-    (yeetube-mode)))
+  (pop-to-buffer-same-window "*yeetube*")
+  (yeetube-mode))
 
 ;;;###autoload
 (defun yeetube-browse-url ()
