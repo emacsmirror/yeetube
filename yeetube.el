@@ -1,11 +1,11 @@
-;;; yeetube.el --- Scrape YouTube - Control MPV - Download content with yt-dlp |  -*- lexical-binding: t; -*-
+;;; yeetube.el --- Scrape YouTube - Play with mpv & Download with yt-dlp |  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2023  Thanos Apollo
+;; Copyright (C) 2023-2024  Thanos Apollo
 
 ;; Author: Thanos Apollo <public@thanosapollo.org>
 ;; Keywords: extensions youtube videos
 ;; URL: https://thanosapollo.org/projects/yeetube/
-;; Version: 2.1.3
+;; Version: 2.1.4
 
 ;; Package-Requires: ((emacs "27.2") (compat "29.1.4.2"))
 
@@ -74,7 +74,7 @@
 		(const :tag "WAV" "wav"))
   :group 'yeetube)
 
-(defcustom yeetube-download-directory "~/Downloads"
+(defcustom yeetube-download-directory (expand-file-name "Downloads" "~")
   "Default directory to downlaod videos."
   :type 'string
   :group 'yeetube)
@@ -106,7 +106,7 @@ Valid options include:
   :group 'yeetube)
 
 (defcustom yeetube-enable-tor nil
-  "Enable routing through tor"
+  "Enable routing through tor."
   :type 'boolean
   :group 'yeetube)
 
@@ -116,21 +116,16 @@ Valid options include:
   :tag "Yeetube Faces"
   :prefix 'yeetube-face)
 
-(defcustom yeetube-thumbnail-height 80
-  "Height of the thumbnail."
-  :type 'number
+(defcustom yeetube-thumbnail-size '(90 . 90)
+  "Thumbnail size (height width)."
+  :type '(cons integer integer)
   :group 'yeetube)
 
-(defcustom yeetube-thumbnail-width 80
-  "Width of the thumbnail."
-  :type 'number
-  :group 'yeetube)
-
-(defcustom yeetube-display-thumbnails nil
+(defcustom yeetube-display-thumbnails t
   "When t, fetch & display thumbnails.
 
 Disabled by default, still an experimental feature that a user should
-opt-in. Note that when enabled the thumbnail images will be downloaded
+opt-in.  Note that when enabled the thumbnail images will be downloaded
 on `temporary-file-directory'."
   :type 'boolean
   :group 'yeetube)
@@ -186,7 +181,7 @@ on `temporary-file-directory'."
 (defvar yeetube-url "https://youtube.com/watch?v="
   "URL used to play videos from.
 
-You can change this value to an invidious instance. Although yeetube
+You can change this value to an invidious instance.  Although yeetube
 will still query youtube, `yeetube-play' will use the above url to play
 videos from.")
 
@@ -295,27 +290,35 @@ WHERE indicates where in the buffer the update should happen."
 		    (save-buffer)
 		    (kill-buffer)))
 
-;; TODO: Find a way to display thumbnails in tabulated list
+(defun yeetube--wget-thumbnail (torsocks url &optional output)
+  "Get thumbnail using `wget' from URL.
+
+If TORSOCKS is non-nil, use torsocks to download URL.
+URL is the URL to download.
+OUTPUT is the output file name."
+  (let ((wget-exec (executable-find "wget")))
+    (unless wget-exec
+      (error "Please install `wget' to download videos"))
+    (let ((command (if torsocks
+		       (format "%s %s %s -O %s.jpg" (executable-find "torsocks") wget-exec
+			       (shell-quote-argument url) (shell-quote-argument output))
+		     (format "%s %s -O %s.jpg" wget-exec (shell-quote-argument url)
+			     (shell-quote-argument output)))))
+      (call-process-shell-command command nil 0))))
+
+
 (cl-defun yeetube-get-thumbnails (content)
   "Download thumbnails for CONTENT using `wget'.
 
-This is used to download thumbnails from `yeetube-content', within
-`yeetube-search'. We can't as of now use images with tabulated-list."
+This is used to download thumbnails from `yeetube-content'."
   (interactive)
   (when yeetube-display-thumbnails
-    (let ((wget-exec (executable-find "wget"))
-	  (default-directory temporary-file-directory))
-      (unless wget-exec
-	(error "Please install `wget', to download thumbnails"))
+    (let ((default-directory temporary-file-directory))
       (cl-loop for item in content
 	       do (let ((thumbnail (plist-get item :thumbnail))
 			(videoid (plist-get item :videoid)))
-		    (call-process-shell-command
-		     (format "%s %s %s %s.jpg" wget-exec
-			     (shell-quote-argument thumbnail)
-			     "-O"
-			     videoid)
-		     nil 0))))))
+		    (unless (file-exists-p (expand-file-name (concat videoid ".jpg")))
+		      (yeetube--wget-thumbnail yeetube-enable-tor thumbnail videoid)))))))
 
 (defvar yeetube-filter-code-alist
   '(("Relevance" . "EgIQAQ%253D%253D")
@@ -328,13 +331,14 @@ This is used to download thumbnails from `yeetube-content', within
   '(("Accept-Language" . "Accept-Language: en-US,en;q=0.9")
     ("Accept" . "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8")
     ("User-Agent" . "Mozilla/5.0 (Windows NT 10.0; rv:122.0) Gecko/20100101 Firefox/122.0"))
-  "HTTP Request extra headers")
+  "HTTP Request extra headers.")
 
 (defun yeetube-get-filter-code (filter)
-  "Get filter code for sorting search results."
+  "Get FILTER code for sorting search results."
   (cdr (assoc filter yeetube-filter-code-alist)))
 
 (defmacro yeetube-with-tor-socks (&rest body)
+  "Execute BODY with torsocks."
   `(let ((url-gateway-method 'socks)
          (socks-noproxy '("localhost"))
          (socks-server '("Default server" "127.0.0.1" 9050 5)))
@@ -359,9 +363,8 @@ This is used to download thumbnails from `yeetube-content', within
       (toggle-enable-multibyte-characters)
       (yeetube-get-content))
     (yeetube-get-thumbnails yeetube-content)) ;; download thumbnails
-  (with-current-buffer
-      (pop-to-buffer-same-window "*yeetube*")
-    (yeetube-mode)))
+  (pop-to-buffer-same-window "*yeetube*")
+  (yeetube-mode))
 
 ;;;###autoload
 (defun yeetube-browse-url ()
@@ -468,7 +471,7 @@ Optional values:
  NAME for custom file name.
  AUDIO-FORMAT to extract and keep contents as specified audio-format only."
   (unless (executable-find "yt-dlp")
-    (error "Executable for yt-dlp not found. Please install yt-dlp"))
+    (error "Executable for yt-dlp not found.  Please install yt-dlp"))
   (let* ((tor-command (when yeetube-enable-tor (executable-find "torsocks")))
          (name-command (when name (format "-o %s" (shell-quote-argument name))))
          (format-command (when audio-format
@@ -543,23 +546,32 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
   "q" #'quit-window)
 
 (defun yeetube--sort-views (a b)
-  "PREDICATE for function 'sort'.
-Used by variable 'tabulated-list-format' to sort the \"Views\"
-column."
+  "PREDICATE for function `sort'.
+
+Used by `tabulated-list-format' to sort the \"Views\"
+column.
+
+A and B are vectors."
   (< (string-to-number (replace-regexp-in-string "," "" (aref (cadr a) 1)))
      (string-to-number (replace-regexp-in-string "," "" (aref (cadr b) 1)))))
 
 (defun yeetube--sort-duration (a b)
-  "PREDICATE for function 'sort'.
-Used by variable 'tabulated-list-format' to sort the \"Duration\"
-column."
+  "PREDICATE for function `sort'.
+
+Used by `tabulated-list-format' to sort the \"Duration\"
+column.
+
+A and B are vectors."
   (< (string-to-number (replace-regexp-in-string ":" "" (aref (cadr a) 2)))
      (string-to-number (replace-regexp-in-string ":" "" (aref (cadr b) 2)))))
 
 (defun yeetube--sort-date (a b)
-  "PREDICATE for function 'sort'.
-Used by variable 'tabulated-list-format' to sort the \"Date\"
-column."
+  "PREDICATE for function `sort'.
+
+Used by variable `tabulated-list-format' to sort the \"Date\"
+column.
+
+A and B are vectors."
   (let* ((intervals '("second" "minute" "hour" "day" "week" "month" "year"))
          (split-a (split-string (replace-regexp-in-string "s" "" (aref (cadr a) 3))))
          (split-b (split-string (replace-regexp-in-string "s" "" (aref (cadr b) 3))))
@@ -568,6 +580,29 @@ column."
     (if (= units-a units-b)
       (< (string-to-number (nth 0 split-a)) (string-to-number (nth 0 split-b)))
       (> units-a units-b))))
+
+;; Modified from iimage.el for hardcoded width/height
+(defun yeetube-iimage-mode-buffer (arg)
+  "Display images if ARG is non-nil, undisplay them otherwise."
+  (let ((image-path (cons default-directory iimage-mode-image-search-path))
+	file)
+    (with-silent-modifications
+      (save-excursion
+        (dolist (pair iimage-mode-image-regex-alist)
+          (goto-char (point-min))
+          (while (re-search-forward (car pair) nil t)
+            (when (and (setq file (match-string (cdr pair)))
+                       (setq file (locate-file file image-path)))
+              (if arg
+                  (add-text-properties
+                   (match-beginning 0) (match-end 0)
+                   `(display
+                     ,(create-image file nil nil
+                                    :max-width (car yeetube-thumbnail-size)
+				    :max-height (cdr yeetube-thumbnail-size)))
+                (remove-list-of-text-properties
+                 (match-beginning 0) (match-end 0)
+                 '(display modification-hooks)))))))))))
 
 (define-derived-mode yeetube-mode tabulated-list-mode "Yeetube"
   "Yeetube mode."
@@ -596,7 +631,7 @@ column."
   (display-line-numbers-mode 0)
   (tabulated-list-init-header)
   (tabulated-list-print)
-  (iimage-mode t))
+  (yeetube-iimage-mode-buffer t))
 
 (provide 'yeetube)
 ;;; yeetube.el ends here
