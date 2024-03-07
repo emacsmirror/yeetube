@@ -428,24 +428,6 @@ This is used to download thumbnails from `yeetube-content'."
       (json-parse-buffer)
     (json-read)))
 
-(cl-defun yeetube-scrape-item (&key item (item-start "text") item-end (substring-start 3) substring-end)
-  "Scrape ITEM from YouTube.com.
-
-Video result starts with videorenderer.
-Search back to videorenderer (start of video results),
-then for item.
-
-ITEM-START is the start of the information for item.
-ITEM-END is the end of the item information.
-SUBSTRING-START is the start of the string to return, integer.
-SUBSTRING-END is the end of the string to return, interger."
-  (search-backward "videorenderer" nil t)
-  (search-forward item nil t)
-  (search-forward item-start nil t)
-  (let ((item (buffer-substring (+ (point) substring-start)
-				(- (search-forward item-end) substring-end))))
-    item))
-
 (defun yeetube-view-count-format (string)
   "Add commas for STRING."
   (let* ((string (replace-regexp-in-string "[^0-9]" "" string))
