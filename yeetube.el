@@ -43,6 +43,7 @@
 (require 'cl-lib)
 (require 'socks)
 (require 'iimage)
+(require 'url-handlers)
 
 (require 'yeetube-mpv)
 
@@ -177,6 +178,9 @@ on `temporary-file-directory'."
 
 (defvar yeetube-history nil
   "Stored urls & titles of recently played content.")
+
+(defvar yeetube-search-history nil
+  "History of search terms.")
 
 (defvar yeetube-url "https://youtube.com/watch?v="
   "URL used to play videos from.
@@ -344,27 +348,62 @@ This is used to download thumbnails from `yeetube-content'."
          (socks-server '("Default server" "127.0.0.1" 9050 5)))
      ,@body))
 
+(defun yeetube--callback (status)
+  "Yeetube callback handling STATUS."
+  (let ((url-buffer (current-buffer)))
+    (unwind-protect
+        (if-let ((err (plist-get :error status)))
+            (message "Error %s in retrieving yeetube results: %S" (car err) (cdr err))
+          (with-temp-buffer
+            (set-buffer-multibyte t)
+            (url-insert url-buffer)
+            (decode-coding-region (point-min) (point-max) 'utf-8)
+            (goto-char (point-min))
+            (yeetube-get-content)
+            (yeetube-get-thumbnails yeetube-content)) ;; download thumbnails
+          (pop-to-buffer-same-window "*yeetube*")
+          (yeetube-mode))
+      (kill-buffer url-buffer))))
+
+(defun yeetube-display-content-from-url (url)
+  "Display the video results from URL."
+  (let* ((url-request-extra-headers yeetube-request-headers))
+    (if yeetube-enable-tor
+        (yeetube-with-tor-socks
+         (url-queue-retrieve url #'yeetube--callback nil 'silent 'inhibit-cookies))
+      (url-queue-retrieve url #'yeetube--callback nil 'silent 'inhibit-cookies))))
+
+(defun yeetube-read-query ()
+  "Interactively read a search term."
+  (read-string "Yeetube Search: " nil 'yeetube-search-history))
+
 ;;;###autoload
 (defun yeetube-search (query)
   "Search for QUERY."
-  (interactive "sYeetube Search: ")
-  (let* ((url-request-extra-headers yeetube-request-headers)
-         (search-url (concat "https://youtube.com/search?q="
-                             (replace-regexp-in-string " " "+" query)
-                             ;; Filter parameter to remove live videos.
-                             "&sp="
-                             (yeetube-get-filter-code yeetube-filter))))
-    (with-current-buffer
-        (if yeetube-enable-tor
-            (yeetube-with-tor-socks (url-retrieve-synchronously search-url 'silent 'inhibit-cookies 30))
-          (url-retrieve-synchronously search-url 'silent 'inhibit-cookies 30))
-      (decode-coding-region (point-min) (point-max) 'utf-8)
-      (goto-char (point-min))
-      (toggle-enable-multibyte-characters)
-      (yeetube-get-content))
-    (yeetube-get-thumbnails yeetube-content)) ;; download thumbnails
-  (pop-to-buffer-same-window "*yeetube*")
-  (yeetube-mode))
+  (interactive (list (yeetube-read-query)))
+  (yeetube-display-content-from-url
+   (format "https://youtube.com/search?q=%s&sp=%s"
+           (url-hexify-string query)
+           (yeetube-get-filter-code yeetube-filter))))
+
+(defun yeetube-channel-id-at-point ()
+  "Return the channel name for the video at point."
+  (if-let ((entry (tabulated-list-get-entry)))
+      (get-text-property 0 :channel-id (aref entry 4))
+    (error "No video at point")))
+
+(defun yeetube-channel-videos (channel-id)
+  "View (some) videos for the channel with CHANNEL-ID."
+  (interactive (list (yeetube-channel-id-at-point)))
+  (yeetube-display-content-from-url (format "https://youtube.com/%s/videos" channel-id)))
+
+(defun yeetube-channel-search (channel-id query)
+  "Search channel with CHANNEL-ID for vidoes matching QUERY."
+  (interactive (list (yeetube-channel-id-at-point) (yeetube-read-query)))
+  (yeetube-display-content-from-url
+   (format "https://youtube.com/%s/search?query=%s"
+           channel-id
+           (url-hexify-string query))))
 
 ;;;###autoload
 (defun yeetube-browse-url ()
@@ -410,30 +449,33 @@ SUBSTRING-END is the end of the string to return, interger."
   "Get content from youtube."
   (setf yeetube-content nil)
   (while (and (< (length yeetube-content) yeetube-results-limit)
-	      (search-forward "videorenderer" nil t))
+              (search-forward "videorenderer" nil t))
     (search-forward "videoid")
     (let ((videoid (buffer-substring (+ (point) 3)
-				     (- (search-forward ",") 2))))
+                                     (- (search-forward ",") 2))))
       (unless (member videoid (car yeetube-content))
-	(let ((title (yeetube-scrape-item :item "title" :item-end ",\"" :substring-end 5))
-	      (view-count (yeetube-scrape-item :item "viewcounttext" :item-end " " :substring-end 0))
-	      (video-duration (yeetube-scrape-item :item "lengthtext" :item-end "}," :substring-end 3))
-	      (channel (yeetube-scrape-item :item "longbylinetext" :item-end "," :substring-end 2))
-	      (thumbnail (yeetube-scrape-item :item "thumbnail" :item-start "url" :item-end ".jpg" :substring-end 0))
-	      (date (yeetube-scrape-item :item "publishedtimetext" :item-end ",\"" :substring-end 4)))
-	  (push (list :title title
-		      :videoid videoid
-		      :view-count (yeetube-view-count-format view-count)
-		      :duration video-duration
-		      :channel channel
-		      :thumbnail (replace-regexp-in-string "hq720" "default" thumbnail)
-		      :date (replace-regexp-in-string "Streamed " "" date)
-		      :image (if yeetube-display-thumbnails
-				 (format "[[%s.jpg]]" (expand-file-name
-						   videoid
-						   temporary-file-directory))
-				 "disabled"))
-		yeetube-content))))))
+        (save-excursion
+          (let ((title (yeetube-scrape-item :item "title" :item-end ",\"" :substring-end 5))
+                (view-count (yeetube-scrape-item :item "viewcounttext" :item-end " " :substring-end 0))
+                (video-duration (yeetube-scrape-item :item "lengthtext" :item-end "}," :substring-end 3))
+                (channel (yeetube-scrape-item :item "longbylinetext" :item-end "," :substring-end 2))
+                (channel-id (yeetube-scrape-item :item "canonicalBaseUrl" :item-start "/"
+                                                 :substring-start 0 :item-end "\"" :substring-end 1))
+                (thumbnail (yeetube-scrape-item :item "thumbnail" :item-start "url" :item-end ".jpg" :substring-end 0))
+                (date (yeetube-scrape-item :item "publishedtimetext" :item-end ",\"" :substring-end 4)))
+            (push (list :title title
+                        :videoid videoid
+                        :view-count (yeetube-view-count-format view-count)
+                        :duration video-duration
+                        :channel (propertize channel :channel-id channel-id)
+                        :thumbnail (replace-regexp-in-string "hq720" "default" thumbnail)
+                        :date (replace-regexp-in-string "Streamed " "" date)
+                        :image (if yeetube-display-thumbnails
+                                   (format "[[%s.jpg]]" (expand-file-name
+                                                         videoid
+                                                         temporary-file-directory))
+                                 "disabled"))
+                  yeetube-content)))))))
 
 (add-variable-watcher 'yeetube-saved-videos #'yeetube-update-saved-videos-list)
 
