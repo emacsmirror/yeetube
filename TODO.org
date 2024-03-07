@@ -1,0 +1,9 @@
+#+title: TODO's for Yeetube
+#+author: Thanos Apollo
+
+* Tabulaed list mode
+** TODO  Fix sorting issues
+  + Reapply yeetube-iimage-buffer-mode-buffer after sorting
+* Features
+** TODO Add yeetube-copy-channel-rss
++ Copy channel rss feed

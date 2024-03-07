@@ -8,7 +8,7 @@
 * How To Contribute
 
 Before starting to work on any big feature, that is not mentioned on
-the [[Task List][Task List]], I recommend you to send me an email first.
+the [[file:TODO.org][TODOs]], I recommend you to send me an email first.
 
 ** How to submit a PR?
 + Feel free to send me a patch, here's how to create one
@@ -23,15 +23,3 @@ $ git format-patch HEAD^1
 #+end_src
 
 /You can find my email on the git log/
-
-
-* Tasks
-** DONE Add sorting for tabulated list views/date/title/duration
-CLOSED: [2024-02-10 Sat 11:38]
-+ With the help of Boruch Baum <boruch_baum@gmx.com>
-
-** Improve interactivity
-+ Sort columns interactively
-
-** Improve torsocks support
-+ Use =socks= to route all traffic from =url= to tor, this should be an opt-in feature
