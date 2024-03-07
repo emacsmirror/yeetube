@@ -429,9 +429,8 @@ SUBSTRING-END is the end of the string to return, interger."
 		      :thumbnail (replace-regexp-in-string "hq720" "default" thumbnail)
 		      :date (replace-regexp-in-string "Streamed " "" date)
 		      :image (if yeetube-display-thumbnails
-				 (format "[[%s.jpg]]" (expand-file-name
-						   videoid
-						   temporary-file-directory))
+				 (format "[[%s.jpg]]"
+					 (expand-file-name videoid temporary-file-directory))
 				 "disabled"))
 		yeetube-content))))))
 
@@ -607,25 +606,23 @@ A and B are vectors."
 (define-derived-mode yeetube-mode tabulated-list-mode "Yeetube"
   "Yeetube mode."
   :keymap yeetube-mode-map
-  (setf tabulated-list-format
-        [("Title" 60 t)
-         ("Views" 11 yeetube--sort-views)
-         ("Duration" 9 yeetube--sort-duration)
-	 ("Date" 13 yeetube--sort-date)
-         ("Channel" 12 t)
-	 ("Thumbnail" 0 t)]
-	tabulated-list-entries
-	(cl-map 'list
-		(lambda (content)
-                  (list content
-			(yeetube-propertize-vector content
-                                                   :title 'yeetube-face-title
-                                                   :view-count 'yeetube-face-view-count
-                                                   :duration 'yeetube-face-duration
-						   :date 'yeetube-face-date
-                                                   :channel 'yeetube-face-channel
-						   :image nil)))
-		(reverse yeetube-content))
+  (setf tabulated-list-format [("Title" 60 nil)
+			       ("Views" 11 nil)
+			       ("Duration" 9 nil)
+			       ("Date" 13 nil)
+			       ("Channel" 12 nil)
+			       ("Thumbnail" 0 nil)]
+	tabulated-list-entries (cl-map 'list
+				       (lambda (content)
+					 (list content
+					       (yeetube-propertize-vector content
+									  :title 'yeetube-face-title
+									  :view-count 'yeetube-face-view-count
+									  :duration 'yeetube-face-duration
+									  :date 'yeetube-face-date
+									  :channel 'yeetube-face-channel
+									  :image nil)))
+				       (reverse yeetube-content))
 	tabulated-list-sort-key (cons yeetube-default-sort-column
                                       yeetube-default-sort-ascending))
   (display-line-numbers-mode 0)
