@@ -42,8 +42,8 @@
 (require 'tabulated-list)
 (require 'cl-lib)
 (require 'socks)
-(require 'iimage)
 (require 'url-handlers)
+(require 'mm-decode)
 
 (require 'yeetube-mpv)
 
@@ -123,11 +123,7 @@ Valid options include:
   :group 'yeetube)
 
 (defcustom yeetube-display-thumbnails t
-  "When t, fetch & display thumbnails.
-
-Disabled by default, still an experimental feature that a user should
-opt-in.  Note that when enabled the thumbnail images will be downloaded
-on `temporary-file-directory'."
+  "When t, fetch & display thumbnails."
   :type 'boolean
   :group 'yeetube)
 
@@ -224,7 +220,7 @@ Keywords:
 (defun yeetube-replay ()
   "Select entry from history to replay.
 
-Select entry title from yeetube-history and play corresponding URL."
+Select entry title from `yeetube-history' and play corresponding URL."
   (interactive)
   (let* ((titles (mapcar (lambda (entry) (cl-getf entry :title)) yeetube-history))
          (selected (completing-read "Replay: " titles))
@@ -294,36 +290,6 @@ WHERE indicates where in the buffer the update should happen."
 		    (save-buffer)
 		    (kill-buffer)))
 
-(defun yeetube--wget-thumbnail (torsocks url &optional output)
-  "Get thumbnail using `wget' from URL.
-
-If TORSOCKS is non-nil, use torsocks to download URL.
-URL is the URL to download.
-OUTPUT is the output file name."
-  (let ((wget-exec (executable-find "wget")))
-    (unless wget-exec
-      (error "Please install `wget' to download videos"))
-    (let ((command (if torsocks
-		       (format "%s %s %s -O %s.jpg" (executable-find "torsocks") wget-exec
-			       (shell-quote-argument url) (shell-quote-argument output))
-		     (format "%s %s -O %s.jpg" wget-exec (shell-quote-argument url)
-			     (shell-quote-argument output)))))
-      (call-process-shell-command command nil 0))))
-
-
-(cl-defun yeetube-get-thumbnails (content)
-  "Download thumbnails for CONTENT using `wget'.
-
-This is used to download thumbnails from `yeetube-content'."
-  (interactive)
-  (when yeetube-display-thumbnails
-    (let ((default-directory temporary-file-directory))
-      (cl-loop for item in content
-	       do (let ((thumbnail (plist-get item :thumbnail))
-			(videoid (plist-get item :videoid)))
-		    (unless (file-exists-p (expand-file-name (concat videoid ".jpg")))
-		      (yeetube--wget-thumbnail yeetube-enable-tor thumbnail videoid)))))))
-
 (defvar yeetube-filter-code-alist
   '(("Relevance" . "EgIQAQ%253D%253D")
     ("Date" . "CAISAhAB")
@@ -359,8 +325,7 @@ This is used to download thumbnails from `yeetube-content'."
             (url-insert url-buffer)
             (decode-coding-region (point-min) (point-max) 'utf-8)
             (goto-char (point-min))
-            (yeetube-get-content)
-            (yeetube-get-thumbnails yeetube-content)) ;; download thumbnails
+            (yeetube-get-content))
           (pop-to-buffer-same-window "*yeetube*")
           (yeetube-mode))
       (kill-buffer url-buffer))))
@@ -372,6 +337,38 @@ This is used to download thumbnails from `yeetube-content'."
         (yeetube-with-tor-socks
          (url-queue-retrieve url #'yeetube--callback nil 'silent 'inhibit-cookies))
       (url-queue-retrieve url #'yeetube--callback nil 'silent 'inhibit-cookies))))
+
+(defun yeetube--image-callback (status entry buffer)
+  "Yeetube callback for thumbnail images handling STATUS.
+Image is inserted in BUFFER for ENTRY."
+  (let ((url-buffer (current-buffer)))
+    (unwind-protect
+        (if-let ((err (plist-get :error status)))
+            (message "Error %s in retrieving a thumnail: %S" (car err) (cdr err))
+          (if-let ((handle (mm-dissect-buffer t))
+                   (image (mm-get-image handle)))
+              (progn
+                (setf (image-property image :max-width) (car yeetube-thumbnail-size))
+                (setf (image-property image :max-height) (cdr yeetube-thumbnail-size))
+                (with-current-buffer buffer
+                  (with-silent-modifications
+                    (save-excursion
+                      (goto-char (point-min))
+                      (search-forward (format "[[%s.jpg]]" (plist-get entry :videoid)))
+                      (put-text-property (match-beginning 0) (match-end 0) 'display image)
+                      (setf (aref (nth 0 (alist-get entry tabulated-list-entries)) 5) image)))))
+            (message "yeetube error: no image found")))
+      (kill-buffer url-buffer))))
+
+(defun yeetube--retrieve-thumnail (url str buffer)
+  "Retrieve thumbnail from URL and show it in place of STR in BUFFER."
+  (let* ((url-request-extra-headers yeetube-request-headers))
+    (if yeetube-enable-tor
+        (yeetube-with-tor-socks
+         (url-queue-retrieve url #'yeetube--image-callback `(,str ,buffer)
+                             'silent 'inhibit-cookies))
+      (url-queue-retrieve url #'yeetube--image-callback `(,str ,buffer)
+                          'silent 'inhibit-cookies))))
 
 (defun yeetube-read-query ()
   "Interactively read a search term."
@@ -404,6 +401,11 @@ This is used to download thumbnails from `yeetube-content'."
    (format "https://youtube.com/%s/search?query=%s"
            channel-id
            (url-hexify-string query))))
+
+(defun yeetube-related (video-id)
+  "View videos found on page for VIDEO-ID."
+  (interactive (list (yeetube-get :videoid)))
+  (yeetube-display-content-from-url (concat yeetube-url video-id)))
 
 ;;;###autoload
 (defun yeetube-browse-url ()
@@ -443,35 +445,41 @@ This is used to download thumbnails from `yeetube-content'."
 (defun yeetube-get-content ()
   "Get content from youtube."
   (setf yeetube-content nil)
-  (while (and (< (length yeetube-content) yeetube-results-limit)
-              (search-forward "videorenderer" nil t))
-    (let ((pos (point)))
+  (let (ids pos videoid)
+    (while (and (< (length yeetube-content) yeetube-results-limit)
+                (search-forward "videorenderer" nil t))
+      (setq pos (point))
       (search-forward "videoid")
-      (let ((videoid (buffer-substring (+ (point) 3)
-                                       (- (search-forward ",") 2))))
-        (unless (member videoid (car yeetube-content))
-          (save-excursion
-            (let ((title (yeetube--scrape-string pos "title" "text"))
-                  (view-count (yeetube--scrape-string pos "viewCountText" "simpleText"))
-                  (video-duration (yeetube--scrape-string pos "lengthText" "simpleText"))
-                  (channel (yeetube--scrape-string pos "longBylineText" "text"))
-                  (channel-id (yeetube--scrape-string pos "canonicalBaseUrl"))
-                  (thumbnail (yeetube--scrape-string pos "thumbnail" "url"))
-                  (date (yeetube--scrape-string pos "publishedTimeText" "simpleText")))
-              (setq thumbnail (substring thumbnail 0 (+ 4 (string-search ".jpg" thumbnail))))
-              (push (list :title title
-                          :videoid videoid
-                          :view-count (yeetube-view-count-format view-count)
-                          :duration video-duration
-                          :channel (propertize channel :channel-id channel-id)
-                          :thumbnail (replace-regexp-in-string "hq720" "default" thumbnail)
-                          :date (replace-regexp-in-string "Streamed " "" date)
-                          :image (if yeetube-display-thumbnails
-                                     (format "[[%s.jpg]]" (expand-file-name
-                                                           videoid
-                                                           temporary-file-directory))
-                                   "disabled"))
-                    yeetube-content))))))))
+      (setq videoid (buffer-substring (+ (point) 3)
+                                      (- (search-forward ",") 2)))
+      (unless (member videoid ids)
+        (push videoid ids)
+        (save-excursion
+          (let ((title (yeetube--scrape-string pos "title" "text"))
+                (view-count (yeetube--scrape-string pos "viewCountText" "simpleText"))
+                (video-duration (yeetube--scrape-string pos "lengthText" "simpleText"))
+                (channel (yeetube--scrape-string pos "longBylineText" "text"))
+                (channel-id (yeetube--scrape-string pos "canonicalBaseUrl"))
+                (thumbnail (yeetube--scrape-string pos "thumbnail" "url"))
+                (date (yeetube--scrape-string pos "publishedTimeText" "simpleText"))
+                (entry nil))
+            (setq thumbnail (string-replace
+                             "hq720" "default"
+                             (substring thumbnail 0 (string-search "?" thumbnail))))
+            (setq entry
+                  (list :title title
+                        :videoid videoid
+                        :view-count (yeetube-view-count-format view-count)
+                        :duration video-duration
+                        :channel (propertize channel :channel-id channel-id)
+                        :thumbnail thumbnail
+                        :date (replace-regexp-in-string "Streamed " "" date)
+                        :image (if yeetube-display-thumbnails
+                                   (format "[[%s.jpg]]" videoid)
+                                 "disabled")))
+            (yeetube--retrieve-thumnail thumbnail entry "*yeetube*")
+            (push entry yeetube-content))))))
+  (cl-callf nreverse yeetube-content))
 
 (add-variable-watcher 'yeetube-saved-videos #'yeetube-update-saved-videos-list)
 
@@ -619,29 +627,6 @@ A and B are vectors."
       (< (string-to-number (nth 0 split-a)) (string-to-number (nth 0 split-b)))
       (> units-a units-b))))
 
-;; Modified from iimage.el for hardcoded width/height
-(defun yeetube-iimage-mode-buffer (arg)
-  "Display images if ARG is non-nil, undisplay them otherwise."
-  (let ((image-path (cons default-directory iimage-mode-image-search-path))
-	file)
-    (with-silent-modifications
-      (save-excursion
-        (dolist (pair iimage-mode-image-regex-alist)
-          (goto-char (point-min))
-          (while (re-search-forward (car pair) nil t)
-            (when (and (setq file (match-string (cdr pair)))
-                       (setq file (locate-file file image-path)))
-              (if arg
-                  (add-text-properties
-                   (match-beginning 0) (match-end 0)
-                   `(display
-                     ,(create-image file nil nil
-                                    :max-width (car yeetube-thumbnail-size)
-				    :max-height (cdr yeetube-thumbnail-size)))
-                (remove-list-of-text-properties
-                 (match-beginning 0) (match-end 0)
-                 '(display modification-hooks)))))))))))
-
 (define-derived-mode yeetube-mode tabulated-list-mode "Yeetube"
   "Yeetube mode."
   :keymap yeetube-mode-map
@@ -653,23 +638,22 @@ A and B are vectors."
          ("Channel" 12 t)
 	 ("Thumbnail" 0 t)]
 	tabulated-list-entries
-	(cl-map 'list
-		(lambda (content)
+        (cl-map 'list
+                (lambda (content)
                   (list content
-			(yeetube-propertize-vector content
+                        (yeetube-propertize-vector content
                                                    :title 'yeetube-face-title
                                                    :view-count 'yeetube-face-view-count
                                                    :duration 'yeetube-face-duration
-						   :date 'yeetube-face-date
+                                                   :date 'yeetube-face-date
                                                    :channel 'yeetube-face-channel
-						   :image nil)))
-		(reverse yeetube-content))
+                                                   :image nil)))
+                yeetube-content)
 	tabulated-list-sort-key (cons yeetube-default-sort-column
                                       yeetube-default-sort-ascending))
   (display-line-numbers-mode 0)
   (tabulated-list-init-header)
-  (tabulated-list-print)
-  (yeetube-iimage-mode-buffer t))
+  (tabulated-list-print))
 
 (provide 'yeetube)
 ;;; yeetube.el ends here
