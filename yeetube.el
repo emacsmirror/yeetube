@@ -415,6 +415,19 @@ This is used to download thumbnails from `yeetube-content'."
 			       (nth invidious-instance yeetube-invidious-instances)
 			       (yeetube-get-url)))))
 
+(defun yeetube--scrape-string (pos item &optional sub-item)
+  "Scrape string corresponding of SUB-ITEM of ITEM after POS."
+  (goto-char pos)
+  (search-forward item nil t)
+  (when sub-item
+   (search-forward sub-item nil t))
+  (forward-char)
+  (search-forward "\"")
+  (backward-char)
+  (if (fboundp 'json-parse-buffer)
+      (json-parse-buffer)
+    (json-read)))
+
 (cl-defun yeetube-scrape-item (&key item (item-start "text") item-end (substring-start 3) substring-end)
   "Scrape ITEM from YouTube.com.
 
@@ -450,32 +463,33 @@ SUBSTRING-END is the end of the string to return, interger."
   (setf yeetube-content nil)
   (while (and (< (length yeetube-content) yeetube-results-limit)
               (search-forward "videorenderer" nil t))
-    (search-forward "videoid")
-    (let ((videoid (buffer-substring (+ (point) 3)
-                                     (- (search-forward ",") 2))))
-      (unless (member videoid (car yeetube-content))
-        (save-excursion
-          (let ((title (yeetube-scrape-item :item "title" :item-end ",\"" :substring-end 5))
-                (view-count (yeetube-scrape-item :item "viewcounttext" :item-end " " :substring-end 0))
-                (video-duration (yeetube-scrape-item :item "lengthtext" :item-end "}," :substring-end 3))
-                (channel (yeetube-scrape-item :item "longbylinetext" :item-end "," :substring-end 2))
-                (channel-id (yeetube-scrape-item :item "canonicalBaseUrl" :item-start "/"
-                                                 :substring-start 0 :item-end "\"" :substring-end 1))
-                (thumbnail (yeetube-scrape-item :item "thumbnail" :item-start "url" :item-end ".jpg" :substring-end 0))
-                (date (yeetube-scrape-item :item "publishedtimetext" :item-end ",\"" :substring-end 4)))
-            (push (list :title title
-                        :videoid videoid
-                        :view-count (yeetube-view-count-format view-count)
-                        :duration video-duration
-                        :channel (propertize channel :channel-id channel-id)
-                        :thumbnail (replace-regexp-in-string "hq720" "default" thumbnail)
-                        :date (replace-regexp-in-string "Streamed " "" date)
-                        :image (if yeetube-display-thumbnails
-                                   (format "[[%s.jpg]]" (expand-file-name
-                                                         videoid
-                                                         temporary-file-directory))
-                                 "disabled"))
-                  yeetube-content)))))))
+    (let ((pos (point)))
+      (search-forward "videoid")
+      (let ((videoid (buffer-substring (+ (point) 3)
+                                       (- (search-forward ",") 2))))
+        (unless (member videoid (car yeetube-content))
+          (save-excursion
+            (let ((title (yeetube--scrape-string pos "title" "text"))
+                  (view-count (yeetube--scrape-string pos "viewCountText" "simpleText"))
+                  (video-duration (yeetube--scrape-string pos "lengthText" "simpleText"))
+                  (channel (yeetube--scrape-string pos "longBylineText" "text"))
+                  (channel-id (yeetube--scrape-string pos "canonicalBaseUrl"))
+                  (thumbnail (yeetube--scrape-string pos "thumbnail" "url"))
+                  (date (yeetube--scrape-string pos "publishedTimeText" "simpleText")))
+              (setq thumbnail (substring thumbnail 0 (+ 4 (string-search ".jpg" thumbnail))))
+              (push (list :title title
+                          :videoid videoid
+                          :view-count (yeetube-view-count-format view-count)
+                          :duration video-duration
+                          :channel (propertize channel :channel-id channel-id)
+                          :thumbnail (replace-regexp-in-string "hq720" "default" thumbnail)
+                          :date (replace-regexp-in-string "Streamed " "" date)
+                          :image (if yeetube-display-thumbnails
+                                     (format "[[%s.jpg]]" (expand-file-name
+                                                           videoid
+                                                           temporary-file-directory))
+                                   "disabled"))
+                    yeetube-content))))))))
 
 (add-variable-watcher 'yeetube-saved-videos #'yeetube-update-saved-videos-list)
 
