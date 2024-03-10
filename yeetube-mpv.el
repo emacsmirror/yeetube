@@ -32,20 +32,34 @@
   :group 'yeetube)
 
 (defcustom yeetube-mpv-enable-torsocks nil
-  "Enable torsocks.")
+  "Enable torsocks."
+  :type 'boolean
+  :group 'yeetube)
 
-(defvar yeetube-mpv-path (executable-find "mpv")
-  "Path for mpv executable.")
+(defcustom yeetube-mpv-show-status nil
+  "Show mpv status in mode-line."
+  :type 'boolean
+  :group 'yeetube)
+
+(setf (alist-get 'yeetube-mpv-show-status mode-line-misc-info nil t)
+      '(("" yeetube-mpv-status)))
+
+(defvar yeetube-mpv-command '("mpv" "--no-msg-color" "--term-status-msg=${?=audio==1:A}${?=video==1:V} ${?=pause==yes:Paused}${?=pause==no:Playing} (${percent-pos}%)")
+  "Cons of mpv command and list of args passed to it.")
 
 (defvar yeetube-mpv-torsocks (executable-find "torsocks")
   "Path to torsocks executable.")
 
 (defvar yeetube-mpv-video-quality "720"
-  "Video resolution/quality
-
+  "Video resolution/quality.
 Accepted values include: 1080, 720, 480, 360, 240, 144")
 
+(defvar yeetube-mpv-status nil
+  "Contains a brief status of the mpv process.")
+(put 'yeetube-mpv-status 'risky-local-variable t)
+
 (defun yeetube-mpv-change-video-quality ()
+  "Change video quality."
   (interactive)
   (let ((new-value (completing-read (format "Set video quality (current value %s):" yeetube-mpv-video-quality)
 				    '("1080" "720" "480" "360" "240" "144") nil t)))

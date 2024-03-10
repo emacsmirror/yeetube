@@ -210,9 +210,11 @@ Keywords:
 (defun yeetube-play ()
   "Play video at point in *yeetube* buffer."
   (interactive)
-  (let ((video-url (yeetube-get-url))
-	(video-title (yeetube-get :title)))
-    (funcall yeetube-play-function video-url)
+  (let* ((video-url (yeetube-get-url))
+	(video-title (yeetube-get :title))
+        (proc (funcall yeetube-play-function video-url)))
+    (when (processp proc)
+      (process-put proc :now-playing video-title))
     (push (list :url video-url :title video-title) yeetube-history)
     (message "Playing: %s" video-title)))
 
@@ -651,6 +653,7 @@ A and B are vectors."
                 yeetube-content)
 	tabulated-list-sort-key (cons yeetube-default-sort-column
                                       yeetube-default-sort-ascending))
+  (setq-local yeetube-mpv-show-status t)
   (display-line-numbers-mode 0)
   (tabulated-list-init-header)
   (tabulated-list-print))
