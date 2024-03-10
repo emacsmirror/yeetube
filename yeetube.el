@@ -447,37 +447,38 @@ Image is inserted in BUFFER for ENTRY."
 (defun yeetube-get-content ()
   "Get content from youtube."
   (setf yeetube-content nil)
-  (let (ids pos videoid)
+  (let (id ids videop pos)
     (while (and (< (length yeetube-content) yeetube-results-limit)
-                (search-forward "videorenderer" nil t))
+                (re-search-forward (rx (or "\"videoRenderer\"" "\"playlistRenderer\"")) nil t))
       (setq pos (point))
-      (search-forward "videoid")
-      (setq videoid (buffer-substring (+ (point) 3)
-                                      (- (search-forward ",") 2)))
-      (unless (member videoid ids)
-        (push videoid ids)
+      (setq videop (equal (match-string 0) "\"videoRenderer\""))
+      (setq id (yeetube--scrape-string pos (if videop "videoId" "playlistId")))
+      (unless (member id ids)
+        (push id ids)
         (save-excursion
-          (let ((title (yeetube--scrape-string pos "title" "text"))
-                (view-count (yeetube--scrape-string pos "viewCountText" "simpleText"))
-                (video-duration (yeetube--scrape-string pos "lengthText" "simpleText"))
+          (let ((title (yeetube--scrape-string pos "title" (if videop "text" "simpleText")))
+                (view-count (when videop (yeetube--scrape-string pos "viewCountText" "simpleText")))
+                (duration (if videop
+                              (yeetube--scrape-string pos "lengthText" "simpleText")
+                            (format "%s videos" (yeetube--scrape-string pos "videoCount"))))
                 (channel (yeetube--scrape-string pos "longBylineText" "text"))
                 (channel-id (yeetube--scrape-string pos "canonicalBaseUrl"))
                 (thumbnail (yeetube--scrape-string pos "thumbnail" "url"))
-                (date (yeetube--scrape-string pos "publishedTimeText" "simpleText"))
+                (date (when videop (yeetube--scrape-string pos "publishedTimeText" "simpleText")))
                 (entry nil))
             (setq thumbnail (string-replace
                              "hq720" "default"
                              (substring thumbnail 0 (string-search "?" thumbnail))))
             (setq entry
-                  (list :title title
-                        :videoid videoid
-                        :view-count (yeetube-view-count-format view-count)
-                        :duration video-duration
+                  (list :title (if videop title (concat "Playlist: " title))
+                        :videoid id
+                        :view-count (yeetube-view-count-format (or view-count ""))
+                        :duration duration
                         :channel (propertize channel :channel-id channel-id)
                         :thumbnail thumbnail
-                        :date (replace-regexp-in-string "Streamed " "" date)
+                        :date (string-replace "Streamed " "" (or date ""))
                         :image (if yeetube-display-thumbnails
-                                   (format "[[%s.jpg]]" videoid)
+                                   (format "[[%s.jpg]]" id)
                                  "disabled")))
             (yeetube--retrieve-thumnail thumbnail entry "*yeetube*")
             (push entry yeetube-content))))))
