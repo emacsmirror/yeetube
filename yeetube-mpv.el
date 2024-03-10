@@ -123,7 +123,7 @@ to play local files."
     (message "yeetube: mpv disabled video")))
 
 (defun yeetube-mpv-send-keypress (key)
-  "Send KEY to yeetube-mpv-process."
+  "Send KEY to `yeetube-mpv-process'."
   (interactive "sKey: ")
   (process-send-string "yeetube" key))
 
@@ -144,6 +144,22 @@ to play local files."
   (interactive)
   (yeetube-mpv-send-keypress "_")
   (message "yeetube: toggle video"))
+
+(defun yeetube-mpv-forward ()
+  "Forward video."
+  (interactive)
+  (yeetube-mpv-send-keypress "[C"))
+
+(defun yeetube-mpv-backward ()
+  "Go backwards in video."
+  (interactive)
+  (yeetube-mpv-send-keypress "[D"))
+
+(defun yeetube-mpv-quit ()
+  "Quit mpv."
+  (interactive)
+  (yeetube-mpv-send-keypress "q")
+  (message "yeetube: quit"))
 
 (provide 'yeetube-mpv)
 ;;; yeetube-mpv.el ends here
