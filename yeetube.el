@@ -178,8 +178,15 @@ Valid options include:
 (defvar yeetube-search-history nil
   "History of search terms.")
 
-(defvar yeetube-url "https://youtube.com/watch?v="
+(defvar yeetube-video-url "https://youtube.com/watch?v="
   "URL used to play videos from.
+
+You can change this value to an invidious instance.  Although yeetube
+will still query youtube, `yeetube-play' will use the above url to play
+videos from.")
+
+(defvar yeetube-playlist-url "https://youtube.com/playlist?list="
+  "URL used to play playlists from.
 
 You can change this value to an invidious instance.  Although yeetube
 will still query youtube, `yeetube-play' will use the above url to play
@@ -193,7 +200,8 @@ Retrieve keyword value for entry at point, from `yeetube-content', in
 
 Keywords:
 - :title
-- :videoid
+- :id
+- :type
 - :view-count
 - :duration
 - :channel"
@@ -202,9 +210,12 @@ Keywords:
   (cl-getf (tabulated-list-get-id) keyword))
 
 (defun yeetube-get-url ()
-  "Get video url."
-  (let ((video-url (concat yeetube-url (yeetube-get :videoid))))
-    video-url))
+  "Get video or playlist url."
+  (format "%s%s"
+          (if (eq (yeetube-get :type) 'video)
+              yeetube-video-url
+            yeetube-playlist-url)
+          (yeetube-get :id)))
 
 ;;;###autoload
 (defun yeetube-play ()
@@ -326,7 +337,6 @@ WHERE indicates where in the buffer the update should happen."
             (set-buffer-multibyte t)
             (url-insert url-buffer)
             (decode-coding-region (point-min) (point-max) 'utf-8)
-            (goto-char (point-min))
             (yeetube-get-content))
           (pop-to-buffer-same-window "*yeetube*")
           (yeetube-mode))
@@ -356,7 +366,7 @@ Image is inserted in BUFFER for ENTRY."
                   (with-silent-modifications
                     (save-excursion
                       (goto-char (point-min))
-                      (search-forward (format "[[%s.jpg]]" (plist-get entry :videoid)))
+                      (search-forward (format "[[%s.jpg]]" (plist-get entry :id)))
                       (put-text-property (match-beginning 0) (match-end 0) 'display image)
                       (setf (aref (nth 0 (alist-get entry tabulated-list-entries)) 5) image)))))
             (message "yeetube error: no image found")))
@@ -381,9 +391,11 @@ Image is inserted in BUFFER for ENTRY."
   "Search for QUERY."
   (interactive (list (yeetube-read-query)))
   (yeetube-display-content-from-url
-   (format "https://youtube.com/search?q=%s&sp=%s"
+   (format "https://youtube.com/search?q=%s%s"
            (url-hexify-string query)
-           (yeetube-get-filter-code yeetube-filter))))
+           (if yeetube-filter
+               (format "&sp=%s" (yeetube-get-filter-code yeetube-filter))
+             ""))))
 
 (defun yeetube-channel-id-at-point ()
   "Return the channel name for the video at point."
@@ -404,10 +416,10 @@ Image is inserted in BUFFER for ENTRY."
            channel-id
            (url-hexify-string query))))
 
-(defun yeetube-related (video-id)
-  "View videos found on page for VIDEO-ID."
-  (interactive (list (yeetube-get :videoid)))
-  (yeetube-display-content-from-url (concat yeetube-url video-id)))
+(defun yeetube-video-or-playlist-page ()
+  "View videos in playlist or those found on the video page."
+  (interactive)
+  (yeetube-display-content-from-url (yeetube-get-url)))
 
 ;;;###autoload
 (defun yeetube-browse-url ()
@@ -447,11 +459,15 @@ Image is inserted in BUFFER for ENTRY."
 (defun yeetube-get-content ()
   "Get content from youtube."
   (setf yeetube-content nil)
-  (let (id ids videop pos)
-    (while (and (< (length yeetube-content) yeetube-results-limit)
-                (re-search-forward (rx (or "\"videoRenderer\"" "\"playlistRenderer\"")) nil t))
+  (goto-char (point-min))
+  (let ((count 0)
+        (result-rx (rx "\"" (or "video" (and (or "playlist" "compact") (? "Video"))) "Renderer\""))
+        id ids videop pos)
+    (while (and (< count yeetube-results-limit)
+                (re-search-forward result-rx nil t))
+      (cl-incf count)
       (setq pos (point))
-      (setq videop (equal (match-string 0) "\"videoRenderer\""))
+      (setq videop (not (equal (match-string 0) "\"playlistRenderer\"")))
       (setq id (yeetube--scrape-string pos (if videop "videoId" "playlistId")))
       (unless (member id ids)
         (push id ids)
@@ -471,7 +487,8 @@ Image is inserted in BUFFER for ENTRY."
                              (substring thumbnail 0 (string-search "?" thumbnail))))
             (setq entry
                   (list :title (if videop title (concat "Playlist: " title))
-                        :videoid id
+                        :type (if videop 'video 'playlist)
+                        :id id
                         :view-count (yeetube-view-count-format (or view-count ""))
                         :duration duration
                         :channel (propertize channel :channel-id channel-id)
