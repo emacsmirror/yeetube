@@ -344,11 +344,11 @@ WHERE indicates where in the buffer the update should happen."
 
 (defun yeetube-display-content-from-url (url)
   "Display the video results from URL."
-  (let* ((url-request-extra-headers yeetube-request-headers))
+  (let ((url-request-extra-headers yeetube-request-headers))
     (if yeetube-enable-tor
         (yeetube-with-tor-socks
-         (url-queue-retrieve url #'yeetube--callback nil 'silent 'inhibit-cookies))
-      (url-queue-retrieve url #'yeetube--callback nil 'silent 'inhibit-cookies))))
+         (url-retrieve url #'yeetube--callback nil 'silent 'inhibit-cookies))
+      (url-retrieve url #'yeetube--callback nil 'silent 'inhibit-cookies))))
 
 (defun yeetube--image-callback (status entry buffer)
   "Yeetube callback for thumbnail images handling STATUS.
@@ -374,7 +374,7 @@ Image is inserted in BUFFER for ENTRY."
 
 (defun yeetube--retrieve-thumnail (url str buffer)
   "Retrieve thumbnail from URL and show it in place of STR in BUFFER."
-  (let* ((url-request-extra-headers yeetube-request-headers))
+  (let ((url-request-extra-headers yeetube-request-headers))
     (if yeetube-enable-tor
         (yeetube-with-tor-socks
          (url-queue-retrieve url #'yeetube--image-callback `(,str ,buffer)
@@ -394,8 +394,7 @@ Image is inserted in BUFFER for ENTRY."
    (format "https://youtube.com/search?q=%s%s"
            (url-hexify-string query)
            (if yeetube-filter
-               (format "&sp=%s" (yeetube-get-filter-code yeetube-filter))
-             ""))))
+               (format "&sp=%s" (yeetube-get-filter-code yeetube-filter)) ""))))
 
 (defun yeetube-channel-id-at-point ()
   "Return the channel name for the video at point."
