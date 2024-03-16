@@ -101,17 +101,18 @@ Accepted values include: 1080, 720, 480, 360, 240, 144")
 
 This function is not specific to just playing urls.  Feel free to use
 to play local files."
-  (yeetube-mpv-process
-   (concat (when yeetube-mpv-enable-torsocks
-	     (concat yeetube-mpv-torsocks " "))
-	   yeetube-mpv-path " --ytdl-format="
-	   (yeetube-mpv-ytdl-format-video-quality yeetube-mpv-video-quality)
-	   " "
-	   (shell-quote-argument input)
-	   (when yeetube-mpv-disable-video " --no-video")))
-  (message (if yeetube-mpv-enable-torsocks
-	       "yeetube: Starting mpv process (using torsocks)"
-	     "yeetube: Starting mpv process")))
+  (let ((yeetube-mpv-path (executable-find "mpv")))
+    (yeetube-mpv-process
+     (concat (when yeetube-mpv-enable-torsocks
+	       (concat yeetube-mpv-torsocks " "))
+	     yeetube-mpv-path " --ytdl-format="
+	     (yeetube-mpv-ytdl-format-video-quality yeetube-mpv-video-quality)
+	     " "
+	     (shell-quote-argument input)
+	     (when yeetube-mpv-disable-video " --no-video")))
+    (message (if yeetube-mpv-enable-torsocks
+		 "yeetube: Starting mpv process (using torsocks)"
+	       "yeetube: Starting mpv process"))))
 
 (defun yeetube-mpv-toggle-no-video-flag ()
   "Toggle no video flag for mpv player."
