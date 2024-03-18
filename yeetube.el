@@ -676,7 +676,9 @@ A and B are vectors."
   (setq-local yeetube-mpv-show-status t)
   (display-line-numbers-mode 0)
   (tabulated-list-init-header)
-  (tabulated-list-print))
+  (tabulated-list-print)
+  (when (fboundp 'emojify-mode)
+    (emojify-mode 1)))
 
 (provide 'yeetube)
 ;;; yeetube.el ends here
