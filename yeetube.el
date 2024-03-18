@@ -655,7 +655,7 @@ A and B are vectors."
          ("Duration" 9 yeetube--sort-duration)
 	 ("Date" 13 yeetube--sort-date)
          ("Channel" 12 t)
-	 ("Thumbnail" 0 t)]
+	 ("Thumbnail" 0 nil)]
 	tabulated-list-entries
         (cl-map 'list
                 (lambda (content)
