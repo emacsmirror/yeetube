@@ -393,8 +393,7 @@ Image is inserted in BUFFER for ENTRY."
   (yeetube-display-content-from-url
    (format "https://youtube.com/search?q=%s%s"
            (url-hexify-string query)
-           (if yeetube-filter
-               (format "&sp=%s" (yeetube-get-filter-code yeetube-filter)) ""))))
+           (if yeetube-filter (format "&sp=%s" (yeetube-get-filter-code yeetube-filter)) ""))))
 
 (defun yeetube-channel-id-at-point ()
   "Return the channel name for the video at point."
@@ -412,8 +411,7 @@ Image is inserted in BUFFER for ENTRY."
   (interactive (list (yeetube-channel-id-at-point) (yeetube-read-query)))
   (yeetube-display-content-from-url
    (format "https://youtube.com/%s/search?query=%s"
-           channel-id
-           (url-hexify-string query))))
+           channel-id (url-hexify-string query))))
 
 (defun yeetube-video-or-playlist-page ()
   "View videos in playlist or those found on the video page."
@@ -462,8 +460,10 @@ Image is inserted in BUFFER for ENTRY."
   (let ((count 0)
         (result-rx (rx "\"" (or "video" (and (or "playlist" "compact") (? "Video"))) "Renderer\""))
         id ids videop pos)
+    ;; Keep scraping while there are results and the limit is not reached
     (while (and (< count yeetube-results-limit)
                 (re-search-forward result-rx nil t))
+      ;; Increment count
       (cl-incf count)
       (setq pos (point))
       (setq videop (not (equal (match-string 0) "\"playlistRenderer\"")))
@@ -471,6 +471,7 @@ Image is inserted in BUFFER for ENTRY."
       (unless (member id ids)
         (push id ids)
         (save-excursion
+	  ;; Scrape necessary data and push to list of contents
           (let ((title (yeetube--scrape-string pos "title" (if videop "text" "simpleText")))
                 (view-count (when videop (yeetube--scrape-string pos "viewCountText" "simpleText")))
                 (duration (if videop
@@ -498,6 +499,7 @@ Image is inserted in BUFFER for ENTRY."
                                  "disabled")))
             (yeetube--retrieve-thumnail thumbnail entry "*yeetube*")
             (push entry yeetube-content))))))
+  ;; Reverse the list of entries before returning
   (cl-callf nreverse yeetube-content))
 
 (add-variable-watcher 'yeetube-saved-videos #'yeetube-update-saved-videos-list)
