@@ -597,6 +597,7 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
   :doc "Keymap for yeetube commands"
   "RET" #'yeetube-play
   "M-RET" #'yeetube-search
+  "C-<return>" #'yeetube-video-or-playlist-page
   "b" #'yeetube-browse-url
   "d" #'yeetube-download-video
   "D" #'yeetube-download-change-directory
