@@ -32,20 +32,19 @@
   :group 'yeetube)
 
 (defcustom yeetube-mpv-enable-torsocks nil
-  "Enable torsocks.")
-
-(defvar yeetube-mpv-path (executable-find "mpv")
-  "Path for mpv executable.")
+  "Enable torsocks."
+  :type 'boolean
+  :group 'yeetube)
 
 (defvar yeetube-mpv-torsocks (executable-find "torsocks")
   "Path to torsocks executable.")
 
 (defvar yeetube-mpv-video-quality "720"
-  "Video resolution/quality
-
+  "Video resolution/quality.
 Accepted values include: 1080, 720, 480, 360, 240, 144")
 
 (defun yeetube-mpv-change-video-quality ()
+  "Change video quality."
   (interactive)
   (let ((new-value (completing-read (format "Set video quality (current value %s):" yeetube-mpv-video-quality)
 				    '("1080" "720" "480" "360" "240" "144") nil t)))
@@ -87,17 +86,18 @@ Accepted values include: 1080, 720, 480, 360, 240, 144")
 
 This function is not specific to just playing urls.  Feel free to use
 to play local files."
-  (yeetube-mpv-process
-   (concat (when yeetube-mpv-enable-torsocks
-	     (concat yeetube-mpv-torsocks " "))
-	   yeetube-mpv-path " --ytdl-format="
-	   (yeetube-mpv-ytdl-format-video-quality yeetube-mpv-video-quality)
-	   " "
-	   (shell-quote-argument input)
-	   (when yeetube-mpv-disable-video " --no-video")))
-  (message (if yeetube-mpv-enable-torsocks
-	       "yeetube: Starting mpv process (using torsocks)"
-	     "yeetube: Starting mpv process")))
+  (let ((yeetube-mpv-path (executable-find "mpv")))
+    (yeetube-mpv-process
+     (concat (when yeetube-mpv-enable-torsocks
+	       (concat yeetube-mpv-torsocks " "))
+	     yeetube-mpv-path " --ytdl-format="
+	     (yeetube-mpv-ytdl-format-video-quality yeetube-mpv-video-quality)
+	     " "
+	     (shell-quote-argument input)
+	     (when yeetube-mpv-disable-video " --no-video")))
+    (message (if yeetube-mpv-enable-torsocks
+		 "yeetube: Starting mpv process (using torsocks)"
+	       "yeetube: Starting mpv process"))))
 
 (defun yeetube-mpv-toggle-no-video-flag ()
   "Toggle no video flag for mpv player."
@@ -109,7 +109,7 @@ to play local files."
     (message "yeetube: mpv disabled video")))
 
 (defun yeetube-mpv-send-keypress (key)
-  "Send KEY to yeetube-mpv-process."
+  "Send KEY to `yeetube-mpv-process'."
   (interactive "sKey: ")
   (process-send-string "yeetube" key))
 
@@ -130,6 +130,22 @@ to play local files."
   (interactive)
   (yeetube-mpv-send-keypress "_")
   (message "yeetube: toggle video"))
+
+(defun yeetube-mpv-forward ()
+  "Forward video."
+  (interactive)
+  (yeetube-mpv-send-keypress "[C"))
+
+(defun yeetube-mpv-backward ()
+  "Go backwards in video."
+  (interactive)
+  (yeetube-mpv-send-keypress "[D"))
+
+(defun yeetube-mpv-quit ()
+  "Quit mpv."
+  (interactive)
+  (yeetube-mpv-send-keypress "q")
+  (message "yeetube: quit"))
 
 (provide 'yeetube-mpv)
 ;;; yeetube-mpv.el ends here
