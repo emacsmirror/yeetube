@@ -5,7 +5,7 @@
 ;; Author: Thanos Apollo <public@thanosapollo.org>
 ;; Keywords: extensions youtube videos
 ;; URL: https://thanosapollo.org/projects/yeetube/
-;; Version: 2.1.4
+;; Version: 2.1.5
 
 ;; Package-Requires: ((emacs "27.2") (compat "29.1.4.2"))
 
@@ -222,8 +222,8 @@ Keywords:
   "Play video at point in *yeetube* buffer."
   (interactive)
   (let* ((video-url (yeetube-get-url))
-	(video-title (yeetube-get :title))
-        (proc (funcall yeetube-play-function video-url)))
+	 (video-title (yeetube-get :title))
+         (proc (funcall yeetube-play-function video-url)))
     (when (processp proc)
       (process-put proc :now-playing video-title))
     (push (list :url video-url :title video-title) yeetube-history)
@@ -433,7 +433,7 @@ Image is inserted in BUFFER for ENTRY."
   (goto-char pos)
   (search-forward item nil t)
   (when sub-item
-   (search-forward sub-item nil t))
+    (search-forward sub-item nil t))
   (forward-char)
   (search-forward "\"")
   (backward-char)
@@ -646,7 +646,7 @@ A and B are vectors."
          (units-a (length (member (nth 1 split-a) intervals)))
          (units-b (length (member (nth 1 split-b) intervals))))
     (if (= units-a units-b)
-      (< (string-to-number (nth 0 split-a)) (string-to-number (nth 0 split-b)))
+	(< (string-to-number (nth 0 split-a)) (string-to-number (nth 0 split-b)))
       (> units-a units-b))))
 
 (define-derived-mode yeetube-mode tabulated-list-mode "Yeetube"
