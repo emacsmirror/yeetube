@@ -111,6 +111,11 @@ Valid options include:
   :type 'boolean
   :group 'yeetube)
 
+(defcustom yeetube-enable-emojis t
+  "Enable emojis in *yeetube* buffer."
+  :type 'boolean
+  :group 'yeetube)
+
 (defgroup yeetube-faces nil
   "Faces used by yeetube."
   :group 'yeetube
@@ -677,7 +682,8 @@ A and B are vectors."
   (display-line-numbers-mode 0)
   (tabulated-list-init-header)
   (tabulated-list-print)
-  (when (fboundp 'emojify-mode)
+  (when (and (fboundp 'emojify-mode)
+	     yeetube-enable-emojis)
     (emojify-mode 1)))
 
 (provide 'yeetube)
