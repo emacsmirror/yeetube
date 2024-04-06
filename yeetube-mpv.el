@@ -43,6 +43,9 @@
   "Video resolution/quality.
 Accepted values include: 1080, 720, 480, 360, 240, 144")
 
+(defvar yeetube-mpv-currently-playing nil
+  "Currently playing information.")
+
 (defun yeetube-mpv-change-video-quality ()
   "Change video quality."
   (interactive)
@@ -81,7 +84,7 @@ Accepted values include: 1080, 720, 480, 360, 240, 144")
   "Return shell quoted argument for ytdlp with RESOLUTION."
   (shell-quote-argument (format "bestvideo[height<=?%s]+bestaudio/best" resolution)))
 
-(defun yeetube-mpv-play (input)
+(defun yeetube-mpv-play (input &optional info)
   "Start yeetube process to play INPUT using mpv.
 
 This function is not specific to just playing urls.  Feel free to use
@@ -97,7 +100,9 @@ to play local files."
 	     (when yeetube-mpv-disable-video " --no-video")))
     (message (if yeetube-mpv-enable-torsocks
 		 "yeetube: Starting mpv process (using torsocks)"
-	       "yeetube: Starting mpv process"))))
+	       "yeetube: Starting mpv process"))
+    (setf yeetube-mpv-currently-playing (format "[%s]" info))))
+
 
 (defun yeetube-mpv-toggle-no-video-flag ()
   "Toggle no video flag for mpv player."
