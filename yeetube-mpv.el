@@ -46,6 +46,12 @@ Accepted values include: 1080, 720, 480, 360, 240, 144")
 (defvar yeetube-mpv-currently-playing nil
   "Currently playing information.")
 
+(defun yeetube-mpv-modeline-string ()
+  "Return modeline string for yeetube-mpv."
+  (if yeetube-mpv-currently-playing
+      (format "%s" yeetube-mpv-currently-playing)
+    "nil"))
+
 (defun yeetube-mpv-change-video-quality ()
   "Change video quality."
   (interactive)
@@ -103,6 +109,22 @@ to play local files."
 	       "yeetube: Starting mpv process"))
     (setf yeetube-mpv-currently-playing (format "[%s]" info))))
 
+(define-minor-mode yeetube-mpv-modeline-mode
+  "Minor mode for showing currently playing information on the modeline."
+  :global t
+  :group 'yeetube
+  :lighter nil
+  (if yeetube-mpv-modeline-mode
+      (progn
+	(add-to-list 'global-mode-string '(:eval
+					   (format " ♫:%s" (yeetube-mpv-modeline-string))))
+	(force-mode-line-update))
+    (setf global-mode-string
+          (seq-remove (lambda (item)
+                        (and (listp item) (eq (car item) :eval)
+                             (string-prefix-p " ♫:" (format "%s" (eval (cadr item))))))
+                      global-mode-string))
+    (force-mode-line-update)))
 
 (defun yeetube-mpv-toggle-no-video-flag ()
   "Toggle no video flag for mpv player."
