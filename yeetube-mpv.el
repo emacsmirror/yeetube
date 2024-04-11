@@ -93,6 +93,8 @@ Accepted values include: 1080, 720, 480, 360, 240, 144")
 (defun yeetube-mpv-play (input &optional info)
   "Start yeetube process to play INPUT using mpv.
 
+INFO: Information to display with `yeetube-mpv-modeline-mode'
+
 This function is not specific to just playing urls.  Feel free to use
 to play local files."
   (let ((yeetube-mpv-path (executable-find "mpv")))
@@ -110,7 +112,10 @@ to play local files."
     (setf yeetube-mpv-currently-playing (format "[%s]" info))))
 
 (define-minor-mode yeetube-mpv-modeline-mode
-  "Minor mode for showing currently playing information on the modeline."
+  "Minor mode for showing currently playing information on the modeline.
+
+To use this mode, you should set `yeetube-play-function' to
+`yeetube-mpv-play'."
   :global t
   :group 'yeetube
   :lighter nil

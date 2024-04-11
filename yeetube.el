@@ -228,7 +228,8 @@ Keywords:
   (interactive)
   (let* ((video-url (yeetube-get-url))
 	 (video-title (yeetube-get :title))
-         (proc (funcall yeetube-play-function video-url (when yeetube-mpv-modeline-mode video-title))))
+         (proc (apply yeetube-play-function video-url
+                      (when yeetube-mpv-modeline-mode (list video-title)))))
     (when (processp proc)
       (process-put proc :now-playing video-title))
     (push (list :url video-url :title video-title) yeetube-history)
