@@ -43,6 +43,15 @@
   "Video resolution/quality.
 Accepted values include: 1080, 720, 480, 360, 240, 144")
 
+(defvar yeetube-mpv-currently-playing nil
+  "Currently playing information.")
+
+(defun yeetube-mpv-modeline-string ()
+  "Return modeline string for yeetube-mpv."
+  (if yeetube-mpv-currently-playing
+      (format "%s" yeetube-mpv-currently-playing)
+    "nil"))
+
 (defun yeetube-mpv-change-video-quality ()
   "Change video quality."
   (interactive)
@@ -81,8 +90,10 @@ Accepted values include: 1080, 720, 480, 360, 240, 144")
   "Return shell quoted argument for ytdlp with RESOLUTION."
   (shell-quote-argument (format "bestvideo[height<=?%s]+bestaudio/best" resolution)))
 
-(defun yeetube-mpv-play (input)
+(defun yeetube-mpv-play (input &optional info)
   "Start yeetube process to play INPUT using mpv.
+
+INFO: Information to display with `yeetube-mpv-modeline-mode'
 
 This function is not specific to just playing urls.  Feel free to use
 to play local files."
@@ -97,7 +108,28 @@ to play local files."
 	     (when yeetube-mpv-disable-video " --no-video")))
     (message (if yeetube-mpv-enable-torsocks
 		 "yeetube: Starting mpv process (using torsocks)"
-	       "yeetube: Starting mpv process"))))
+	       "yeetube: Starting mpv process"))
+    (setf yeetube-mpv-currently-playing (format "[%s]" info))))
+
+(define-minor-mode yeetube-mpv-modeline-mode
+  "Minor mode for showing currently playing information on the modeline.
+
+To use this mode, you should set `yeetube-play-function' to
+`yeetube-mpv-play'."
+  :global t
+  :group 'yeetube
+  :lighter nil
+  (if yeetube-mpv-modeline-mode
+      (progn
+	(add-to-list 'global-mode-string '(:eval
+					   (format " ♫:%s" (yeetube-mpv-modeline-string))))
+	(force-mode-line-update))
+    (setf global-mode-string
+          (seq-remove (lambda (item)
+                        (and (listp item) (eq (car item) :eval)
+                             (string-prefix-p " ♫:" (format "%s" (eval (cadr item))))))
+                      global-mode-string))
+    (force-mode-line-update)))
 
 (defun yeetube-mpv-toggle-no-video-flag ()
   "Toggle no video flag for mpv player."

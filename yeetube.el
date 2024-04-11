@@ -5,7 +5,7 @@
 ;; Author: Thanos Apollo <public@thanosapollo.org>
 ;; Keywords: extensions youtube videos
 ;; URL: https://thanosapollo.org/projects/yeetube/
-;; Version: 2.1.5
+;; Version: 2.1.6
 
 ;; Package-Requires: ((emacs "27.2") (compat "29.1.4.2"))
 
@@ -228,7 +228,8 @@ Keywords:
   (interactive)
   (let* ((video-url (yeetube-get-url))
 	 (video-title (yeetube-get :title))
-         (proc (funcall yeetube-play-function video-url)))
+         (proc (apply yeetube-play-function video-url
+                      (when yeetube-mpv-modeline-mode (list video-title)))))
     (when (processp proc)
       (process-put proc :now-playing video-title))
     (push (list :url video-url :title video-title) yeetube-history)
@@ -243,8 +244,9 @@ Select entry title from `yeetube-history' and play corresponding URL."
   (let* ((titles (mapcar (lambda (entry) (cl-getf entry :title)) yeetube-history))
          (selected (completing-read "Replay: " titles))
          (selected-entry (cl-find-if (lambda (entry) (string= selected (cl-getf entry :title))) yeetube-history))
+	 (title (cl-getf selected-entry :title))
          (url (cl-getf selected-entry :url)))
-    (funcall yeetube-play-function url)
+    (funcall yeetube-play-function url (when yeetube-mpv-modeline-mode title))
     (message "Replaying: %s" selected)))
 
 (defun yeetube-load-saved-videos ()
@@ -274,11 +276,14 @@ Select entry title from `yeetube-history' and play corresponding URL."
   "Select & Play a saved video."
   (interactive)
   (yeetube-load-saved-videos)
-  (let ((video (completing-read "Select video: " yeetube-saved-videos nil t)))
-    (funcall yeetube-play-function (cdr (assoc video yeetube-saved-videos)))
+  (let* ((video (completing-read "Select video: " yeetube-saved-videos nil t))
+	 (url (cdr (assoc video yeetube-saved-videos)))
+	 (title (car (assoc video yeetube-saved-videos))))
+    (funcall yeetube-play-function url (when yeetube-mpv-modeline-mode title))
     (message "Playing: %s" (car (assoc video yeetube-saved-videos)))))
 
 ;;;###autoload
+
 (defun yeetube-remove-saved-video ()
   "Select video to remove from saved videos."
   (interactive)
@@ -658,12 +663,12 @@ A and B are vectors."
   "Yeetube mode."
   :keymap yeetube-mode-map
   (setf tabulated-list-format
-        [("Title" 60 t)
+        [("Title" 50 t)
          ("Views" 11 yeetube--sort-views)
          ("Duration" 9 yeetube--sort-duration)
 	 ("Date" 13 yeetube--sort-date)
          ("Channel" 12 t)
-	 ("Thumbnail" 0 nil)]
+	 ("Thumbnail" 20 nil)]
 	tabulated-list-entries
         (cl-map 'list
                 (lambda (content)
@@ -674,7 +679,7 @@ A and B are vectors."
                                                    :duration 'yeetube-face-duration
                                                    :date 'yeetube-face-date
                                                    :channel 'yeetube-face-channel
-                                                   :image nil)))
+						   :image nil)))
                 yeetube-content)
 	tabulated-list-sort-key (cons yeetube-default-sort-column
                                       yeetube-default-sort-ascending))
