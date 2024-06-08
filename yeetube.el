@@ -44,6 +44,7 @@
 (require 'socks)
 (require 'url-handlers)
 (require 'mm-decode)
+(require 'xdg)
 
 (require 'yeetube-mpv)
 
@@ -75,7 +76,7 @@
 		(const :tag "WAV" "wav"))
   :group 'yeetube)
 
-(defcustom yeetube-download-directory (expand-file-name "Downloads" "~")
+(defcustom yeetube-download-directory (or (xdg-user-dir "DOWNLOAD") (getenv "HOME"))
   "Default directory to downlaod videos."
   :type 'string
   :group 'yeetube)
