@@ -367,12 +367,12 @@ Image is inserted in BUFFER for ENTRY."
   (let ((url-buffer (current-buffer)))
     (unwind-protect
         (if-let ((err (plist-get :error status)))
-            (message "Error %s in retrieving a thumnail: %S" (car err) (cdr err))
+            (message "Error %s in retrieving a thumbnail: %S" (car err) (cdr err))
           (if-let ((handle (mm-dissect-buffer t))
                    (image (mm-get-image handle)))
               (progn
-                (setf (image-property image :max-width) (car yeetube-thumbnail-size))
-                (setf (image-property image :max-height) (cdr yeetube-thumbnail-size))
+                (setf (image-property image :max-width) (car yeetube-thumbnail-size)
+		      (image-property image :max-height) (cdr yeetube-thumbnail-size))
                 (with-current-buffer buffer
                   (with-silent-modifications
                     (save-excursion
