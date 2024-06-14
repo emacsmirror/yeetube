@@ -324,7 +324,7 @@ WHERE indicates where in the buffer the update should happen."
 (defvar yeetube-request-headers
   '(("Accept-Language" . "Accept-Language: en-US,en;q=0.9")
     ("Accept" . "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8")
-    ("User-Agent" . "Mozilla/5.0 (Windows NT 10.0; rv:122.0) Gecko/20100101 Firefox/122.0"))
+    ("User-Agent" . "Mozilla/5.0 (Windows NT 10.0; rv:126.0) Gecko/20100101 Firefox/126.0"))
   "HTTP Request extra headers.")
 
 (defun yeetube-get-filter-code (filter)
