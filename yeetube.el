@@ -563,10 +563,13 @@ Optional values:
     (call-process-shell-command command nil 0)))
 
 ;;;###autoload
-(defun yeetube-download-video ()
-  "Download entry at point in *yeetube* buffer with yt-dlp."
+(defun yeetube-download-video (&optional url)
+  "Download entry at point in *yeetube* buffer with yt-dlp.
+
+Content will be downloaded at `yeetube-download-directory'.
+Optionally, provide custom own URL."
   (interactive)
-  (let ((url (yeetube-get-url)))
+  (let ((url (or url (yeetube-get-url))))
     (when (string-prefix-p "http" url)
       (let ((default-directory yeetube-download-directory))
         (yeetube-download--ytdlp url nil yeetube-download-audio-format)
