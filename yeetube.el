@@ -584,15 +584,13 @@ Open a Dired buffer and navigate where you want to download your
 videos, then run this command interactively.  You can leave the name
 prompt blank to keep the default name."
   (interactive)
-  (let ((url "")
-	(name "")
-	(download-counter 1))
-    (while (not (string= url "q"))
-      (setf url (read-string "Enter URL (q to quit): "))
-      (unless (string= url "q")
-	(setf name (read-string (format "Custom name (download counter: %d) " download-counter)))
-	(setf download-counter (1+ download-counter))
-	(yeetube-download--ytdlp url name yeetube-download-audio-format)))))
+  (let ((download-counter 1))
+    (cl-loop
+     for url = (read-string "Enter URL (q to quit): ")
+     until (string= url "q")
+     do (let ((name (read-string (format "Custom name (download counter: %d) " download-counter))))
+          (yeetube-download--ytdlp url name yeetube-download-audio-format)
+          (cl-incf download-counter)))))
 
 (defun yeetube-propertize-vector (content &rest fields-face-pairs)
   "Create a vector with each item propertized with its corresponding face.
