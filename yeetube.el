@@ -661,34 +661,45 @@ A and B are vectors."
 	(< (string-to-number (nth 0 split-a)) (string-to-number (nth 0 split-b)))
       (> units-a units-b))))
 
+(defun yeetube-tabulated-list (&optional title-width channel-width views-width
+					 duration-width date-width thumbnail-width)
+  "Return a tabulated list, adjusted for `window-width'."
+  (let ((thumbnail-width (or thumbnail-width (/ (window-width) 10)))
+	(title-width (or title-width (/ (window-width) 3)))
+	(channel-width (or channel-width (/ (window-width) 8)))
+	(views-width (or views-width (/ (window-width) 8)))
+	(duration-width (or duration-width (/ (window-width) 8)))
+	(date-width (or date-width (/ (window-width) 8))))
+    (setf tabulated-list-format
+          `[("Title" ,title-width t)
+            ("Views" ,views-width yeetube--sort-views)
+            ("Duration" ,duration-width yeetube--sort-duration)
+	    ("Date" ,date-width yeetube--sort-date)
+            ("Channel" ,channel-width t)
+	    ("Thumbnail" ,thumbnail-width nil)]
+	  tabulated-list-entries
+          (cl-map 'list
+                  (lambda (content)
+                    (list content
+                          (yeetube-propertize-vector content
+                                                     :title 'yeetube-face-title
+                                                     :view-count 'yeetube-face-view-count
+                                                     :duration 'yeetube-face-duration
+                                                     :date 'yeetube-face-date
+                                                     :channel 'yeetube-face-channel
+						     :image nil)))
+                  yeetube-content)
+	  tabulated-list-sort-key (cons yeetube-default-sort-column
+					yeetube-default-sort-ascending))
+    (tabulated-list-print)))
+
 (define-derived-mode yeetube-mode tabulated-list-mode "Yeetube"
   "Yeetube mode."
   :keymap yeetube-mode-map
-  (setf tabulated-list-format
-        [("Title" 50 t)
-         ("Views" 11 yeetube--sort-views)
-         ("Duration" 9 yeetube--sort-duration)
-	 ("Date" 13 yeetube--sort-date)
-         ("Channel" 12 t)
-	 ("Thumbnail" 20 nil)]
-	tabulated-list-entries
-        (cl-map 'list
-                (lambda (content)
-                  (list content
-                        (yeetube-propertize-vector content
-                                                   :title 'yeetube-face-title
-                                                   :view-count 'yeetube-face-view-count
-                                                   :duration 'yeetube-face-duration
-                                                   :date 'yeetube-face-date
-                                                   :channel 'yeetube-face-channel
-						   :image nil)))
-                yeetube-content)
-	tabulated-list-sort-key (cons yeetube-default-sort-column
-                                      yeetube-default-sort-ascending))
+  (yeetube-tabulated-list)
   (setq-local yeetube-mpv-show-status t)
   (display-line-numbers-mode 0)
   (tabulated-list-init-header)
-  (tabulated-list-print)
   (when (and (fboundp 'emojify-mode)
 	     yeetube-enable-emojis)
     (emojify-mode 1)))
