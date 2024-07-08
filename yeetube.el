@@ -366,22 +366,27 @@ WHERE indicates where in the buffer the update should happen."
 Image is inserted in BUFFER for ENTRY."
   (let ((url-buffer (current-buffer)))
     (unwind-protect
-        (if-let ((err (plist-get :error status)))
+        (if-let ((err (plist-get status :error)))
             (message "Error %s in retrieving a thumbnail: %S" (car err) (cdr err))
           (if-let ((handle (mm-dissect-buffer t))
                    (image (mm-get-image handle)))
               (progn
                 (setf (image-property image :max-width) (car yeetube-thumbnail-size)
-		      (image-property image :max-height) (cdr yeetube-thumbnail-size))
+                      (image-property image :max-height) (cdr yeetube-thumbnail-size))
+                ;; Debugging Statement
+                ;; (message "Retrieved and processing image for %s" (plist-get entry :title))
                 (with-current-buffer buffer
                   (with-silent-modifications
                     (save-excursion
                       (goto-char (point-min))
                       (search-forward (format "[[%s.jpg]]" (plist-get entry :id)))
-                      (put-text-property (match-beginning 0) (match-end 0) 'display image)
-                      (setf (aref (nth 0 (alist-get entry tabulated-list-entries)) 5) image)))))
-            (message "yeetube error: no image found")))
-      (kill-buffer url-buffer))))
+                      ;; Ensure to remove the placeholder text
+                      (delete-region (match-beginning 0) (match-end 0))
+                      (insert-image image)
+                      ;; Debugging Statement
+                      ;; (message "Inserted image for %s" (plist-get entry :title))
+                      (setf (aref (nth 0 (alist-get entry tabulated-list-entries)) 0) image))))))
+	  (kill-buffer url-buffer)))))
 
 (defun yeetube--retrieve-thumnail (url str buffer)
   "Retrieve thumbnail from URL and show it in place of STR in BUFFER."
