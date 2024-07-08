@@ -680,27 +680,27 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
   (let ((thumbnail-width (or thumbnail-width (/ (window-width) 10)))
 	(title-width (or title-width (/ (window-width) 3)))
 	(channel-width (or channel-width (/ (window-width) 8)))
-	(views-width (or views-width (/ (window-width) 8)))
-	(duration-width (or duration-width (/ (window-width) 8)))
+	(views-width (or views-width (/ (window-width) 10)))
+	(duration-width (or duration-width (/ (window-width) 10)))
 	(date-width (or date-width (/ (window-width) 8))))
     (setf tabulated-list-format
-          `[("Title" ,title-width t)
+          `[("Thumbnail" ,thumbnail-width nil)
+	    ("Title" ,title-width t)
             ("Views" ,views-width yeetube--sort-views)
             ("Duration" ,duration-width yeetube--sort-duration)
 	    ("Date" ,date-width yeetube--sort-date)
-            ("Channel" ,channel-width t)
-	    ("Thumbnail" ,thumbnail-width nil)]
+            ("Channel" ,channel-width t)]
 	  tabulated-list-entries
           (cl-map 'list
                   (lambda (content)
                     (list content
                           (yeetube-propertize-vector content
-                                                     :title 'yeetube-face-title
+                                                     :image nil
+						     :title 'yeetube-face-title
                                                      :view-count 'yeetube-face-view-count
                                                      :duration 'yeetube-face-duration
                                                      :date 'yeetube-face-date
-                                                     :channel 'yeetube-face-channel
-						     :image nil)))
+                                                     :channel 'yeetube-face-channel)))
                   yeetube-content)
 	  tabulated-list-sort-key (cons yeetube-default-sort-column
 					yeetube-default-sort-ascending))
