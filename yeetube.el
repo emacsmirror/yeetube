@@ -123,7 +123,7 @@ Valid options include:
   :tag "Yeetube Faces"
   :prefix 'yeetube-face)
 
-(defcustom yeetube-thumbnail-size '(90 . 90)
+(defcustom yeetube-thumbnail-size '(120 . 90)
   "Thumbnail size (height width)."
   :type '(cons integer integer)
   :group 'yeetube)
