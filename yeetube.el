@@ -1,11 +1,11 @@
-;;; yeetube.el --- Scrape YouTube - Play with mpv & Download with yt-dlp |  -*- lexical-binding: t; -*-
+;;; yeetube.el --- Scrape YouTube, Play with mpv & Download with yt-dlp  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2023-2024  Thanos Apollo
 
 ;; Author: Thanos Apollo <public@thanosapollo.org>
 ;; Keywords: extensions youtube videos
 ;; URL: https://thanosapollo.org/projects/yeetube/
-;; Version: 2.1.6
+;; Version: 2.1.7
 
 ;; Package-Requires: ((emacs "27.2") (compat "29.1.4.2"))
 
@@ -29,10 +29,10 @@
 ;;
 ;; Core features include:
 ;;
-;; - Executing queries on YouTube
-;; - Playing video URLs using default mpv
-;; - Bookmark/Save video url for future reference
-;; - Download video using yt-dlp
+;; - Executing YouTube queries
+;; - Playing videos, by default using MPV
+;; - Downloading videos, using yt-dlp
+;; - Bookmarking and saving video URLs
 ;; - A standalone, minimalist yt-dlp frontend
 
 ;;; Code:
