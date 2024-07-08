@@ -631,40 +631,48 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
   "q" #'quit-window)
 
 (defun yeetube--sort-views (a b)
-  "PREDICATE for function `sort'.
+  "Sort entries A and B by view count."
+  (let ((views-a (string-to-number (replace-regexp-in-string "," "" (aref (cadr a) 2))))
+        (views-b (string-to-number (replace-regexp-in-string "," "" (aref (cadr b) 2)))))
+    (< views-a views-b)))
 
-Used by `tabulated-list-format' to sort the \"Views\"
-column.
-
-A and B are vectors."
-  (< (string-to-number (replace-regexp-in-string "," "" (aref (cadr a) 1)))
-     (string-to-number (replace-regexp-in-string "," "" (aref (cadr b) 1)))))
+(defun yeetube--duration-to-seconds (duration)
+  "Convert DURATION string in 'HH:MM:SS' format to total seconds."
+  (let* ((parts (mapcar #'string-to-number (split-string duration ":")))
+         (len (length parts)))
+    (cond
+     ((= len 3) (+ (* (nth 0 parts) 3600) (* (nth 1 parts) 60) (nth 2 parts)))
+     ((= len 2) (+ (* (nth 0 parts) 60) (nth 1 parts)))
+     ((= len 1) (nth 0 parts))
+     (t 0))))
 
 (defun yeetube--sort-duration (a b)
-  "PREDICATE for function `sort'.
+  "Sort entries A and B by duration."
+  (let ((duration-a (yeetube--duration-to-seconds (aref (cadr a) 3)))
+        (duration-b (yeetube--duration-to-seconds (aref (cadr b) 3))))
+    (< duration-a duration-b)))
 
-Used by `tabulated-list-format' to sort the \"Duration\"
-column.
-
-A and B are vectors."
-  (< (string-to-number (replace-regexp-in-string ":" "" (aref (cadr a) 2)))
-     (string-to-number (replace-regexp-in-string ":" "" (aref (cadr b) 2)))))
+(defun yeetube--parse-relative-date (date)
+  "Convert relative DATE like '2 days ago' to a comparable number based on seconds."
+  (let* ((split-date (split-string date " "))
+         (value (string-to-number (nth 0 split-date)))
+         (unit (nth 1 split-date))
+         (seconds-per-unit (cond
+                            ((or (string= "second" unit) (string= "seconds" unit)) 1)
+                            ((or (string= "minute" unit) (string= "minutes" unit)) 60)
+                            ((or (string= "hour" unit) (string= "hours" unit)) (* 60 60))
+                            ((or (string= "day" unit) (string= "days" unit)) (* 60 60 24))
+                            ((or (string= "week" unit) (string= "weeks" unit)) (* 60 60 24 7))
+                            ((or (string= "month" unit) (string= "months" unit)) (* 60 60 24 30))
+                            ((or (string= "year" unit) (string= "years" unit)) (* 60 60 24 365))
+                            (t 0))))
+    (* value seconds-per-unit)))
 
 (defun yeetube--sort-date (a b)
-  "PREDICATE for function `sort'.
-
-Used by variable `tabulated-list-format' to sort the \"Date\"
-column.
-
-A and B are vectors."
-  (let* ((intervals '("second" "minute" "hour" "day" "week" "month" "year"))
-         (split-a (split-string (replace-regexp-in-string "s" "" (aref (cadr a) 3))))
-         (split-b (split-string (replace-regexp-in-string "s" "" (aref (cadr b) 3))))
-         (units-a (length (member (nth 1 split-a) intervals)))
-         (units-b (length (member (nth 1 split-b) intervals))))
-    (if (= units-a units-b)
-	(< (string-to-number (nth 0 split-a)) (string-to-number (nth 0 split-b)))
-      (> units-a units-b))))
+  "Sort entries A and B by relative date."
+  (let ((date-a (yeetube--parse-relative-date (aref (cadr a) 4)))
+        (date-b (yeetube--parse-relative-date (aref (cadr b) 4))))
+    (< date-a date-b)))
 
 (defun yeetube-tabulated-list (&optional title-width channel-width views-width
 					 duration-width date-width thumbnail-width)
