@@ -412,18 +412,18 @@ Image is inserted in BUFFER for ENTRY."
            (if yeetube-filter (format "&sp=%s" (yeetube-get-filter-code yeetube-filter)) ""))))
 
 (defun yeetube-channel-id-at-point ()
-  "Return the channel name for the video at point."
-  (if-let ((entry (tabulated-list-get-entry)))
-      (get-text-property 0 :channel-id (aref entry 4))
-    (error "No video at point")))
+  "Return yeetube channel id at point."
+  (if-let ((id (tabulated-list-get-id)))
+      (get-text-property 0 :channel-id (plist-get id :channel))
+    (user-error "No video at point")))
 
-(defun yeetube-channel-videos (channel-id)
-  "View (some) videos for the channel with CHANNEL-ID."
-  (interactive (list (yeetube-channel-id-at-point)))
+(defun yeetube-channel-videos (&optional channel-id)
+  "View videos for the channel with CHANNEL-ID."
+  (interactive (list (or (yeetube-channel-id-at-point) (format "@%s" (read-string "Channel: ")))))
   (yeetube-display-content-from-url (format "https://youtube.com/%s/videos" channel-id)))
 
 (defun yeetube-channel-search (channel-id query)
-  "Search channel with CHANNEL-ID for vidoes matching QUERY."
+  "Search channel with CHANNEL-ID for videoes matching QUERY."
   (interactive (list (yeetube-channel-id-at-point) (yeetube-read-query)))
   (yeetube-display-content-from-url
    (format "https://youtube.com/%s/search?query=%s"
