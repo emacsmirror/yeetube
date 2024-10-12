@@ -164,12 +164,7 @@ Valid options include:
   :group 'yeetube-faces)
 
 (defvar yeetube-invidious-instances
-  '("vid.puffyan.us"
-    "invidious.flokinet.to"
-    "yt.artemislena.eu"
-    "invidious.privacydev.net"
-    "onion.tube"
-    "yewtu.be")
+  '("vid.puffyan.us" "inv.nadeko.net" "invidious.flokinet.to")
   "List of invidious instaces.")
 
 (defvar yeetube-content nil
