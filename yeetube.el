@@ -433,11 +433,17 @@ Image is inserted in BUFFER for ENTRY."
 (defun yeetube-browse-url ()
   "Open URL for video at point, using an invidious instance."
   (interactive)
-  (let ((invidious-instance (+ 1 (random (length yeetube-invidious-instances)))))
+  (let ((invidious-instance (cond ((and (listp yeetube-invidious-instances)
+					(length> yeetube-invidious-instances 1))
+				   (nth (random (length yeetube-invidious-instances))
+					yeetube-invidious-instances))
+				  ((and (listp yeetube-invidious-instances)
+					(length= yeetube-invidious-instances 1))
+				   (car yeetube-invidious-instances))
+				  ((stringp yeetube-invidious-instances)
+				   yeetube-invidious-instances))))
     (browse-url
-     (replace-regexp-in-string "youtube.com"
-			       (nth invidious-instance yeetube-invidious-instances)
-			       (yeetube-get-url)))))
+     (replace-regexp-in-string "youtube.com" invidious-instance (yeetube-get-url)))))
 
 (defun yeetube--scrape-string (pos item &optional sub-item)
   "Scrape string corresponding of SUB-ITEM of ITEM after POS."
