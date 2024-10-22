@@ -622,6 +622,7 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
   "M-RET" #'yeetube-search
   "C-<return>" #'yeetube-video-or-playlist-page
   "b" #'yeetube-browse-url
+  "c" #'yeetube-channel-videos
   "d" #'yeetube-download-video
   "D" #'yeetube-download-change-directory
   "a" #'yeetube-download-change-audio-format
