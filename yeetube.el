@@ -193,6 +193,9 @@ You can change this value to an invidious instance.  Although yeetube
 will still query youtube, `yeetube-play' will use the above url to play
 videos from.")
 
+(defvar yeetube--channel-id nil
+  "Value of channel which `yeetube-channel-videos' used for.")
+
 (defun yeetube-get (keyword)
   "Retrieve KEYWORD value for entry at point.
 
@@ -415,6 +418,7 @@ Image is inserted in BUFFER for ENTRY."
 (defun yeetube-channel-videos (&optional channel-id)
   "View videos for the channel with CHANNEL-ID."
   (interactive (list (or (yeetube-channel-id-at-point) (format "@%s" (read-string "Channel: ")))))
+  (setf yeetube--channel-id (substring channel-id 2))
   (yeetube-display-content-from-url (format "https://youtube.com/%s/videos" channel-id)))
 
 (defun yeetube-channel-search (channel-id query)
@@ -499,6 +503,7 @@ Image is inserted in BUFFER for ENTRY."
                 (thumbnail (yeetube--scrape-string pos "thumbnail" "url"))
                 (date (when videop (yeetube--scrape-string pos "publishedTimeText" "simpleText")))
                 (entry nil))
+	    (when (string= channel title) (setf channel yeetube--channel-id))
             (setq thumbnail (string-replace
                              "hq720" "default"
                              (substring thumbnail 0 (string-search "?" thumbnail))))
