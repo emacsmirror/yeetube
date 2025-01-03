@@ -36,6 +36,11 @@
   :type 'boolean
   :group 'yeetube)
 
+(defcustom yeetube-mpv-additional-flags nil
+  "Additional flags to pass to mpv."
+  :type 'string
+  :group 'yeetube)
+
 (defvar yeetube-mpv-torsocks (executable-find "torsocks")
   "Path to torsocks executable.")
 
@@ -64,9 +69,9 @@ Accepted values include: 1080, 720, 480, 360, 240, 144")
   (interactive)
   (pcase yeetube-mpv-torsocks
     ('t (setf yeetube-mpv-torsocks nil)
-       (message "yeetube: Torsocks disabled"))
+	(message "yeetube: Torsocks disabled"))
     ('nil (setf yeetube-mpv-torsocks t)
-	   (message "yeetube: Torsocks enabled"))))
+	  (message "yeetube: Torsocks enabled"))))
 
 (defun yeetube-mpv-check ()
   "Check if mpv and yt-dlp is installed."
@@ -105,7 +110,8 @@ to play local files."
 	     (yeetube-mpv-ytdl-format-video-quality yeetube-mpv-video-quality)
 	     " "
 	     (shell-quote-argument input)
-	     (when yeetube-mpv-disable-video " --no-video")))
+	     (when yeetube-mpv-disable-video " --no-video")
+	     yeetube-mpv-additional-flags))
     (message (if yeetube-mpv-enable-torsocks
 		 "yeetube: Starting mpv process (using torsocks)"
 	       "yeetube: Starting mpv process"))
