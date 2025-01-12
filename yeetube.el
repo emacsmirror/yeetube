@@ -128,8 +128,8 @@ Valid options include:
   :type '(cons integer integer)
   :group 'yeetube)
 
-(defcustom yeetube-display-thumbnails t
-  "When t, fetch & display thumbnails."
+(defcustom yeetube-display-thumbnails-p t
+  "When non-nil, fetch & display thumbnails."
   :type 'boolean
   :group 'yeetube)
 
@@ -644,7 +644,7 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
     (< views-a views-b)))
 
 (defun yeetube--duration-to-seconds (duration)
-  "Convert DURATION string in 'HH:MM:SS' format to total seconds."
+  "Convert DURATION string in ='HH:MM:SS' format to total seconds."
   (let* ((parts (mapcar #'string-to-number (split-string duration ":")))
          (len (length parts)))
     (cond
@@ -681,36 +681,37 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
         (date-b (yeetube--parse-relative-date (aref (cadr b) 4))))
     (< date-a date-b)))
 
-(defun yeetube-tabulated-list (&optional title-width channel-width views-width
-					 duration-width date-width thumbnail-width)
-  "Return a tabulated list, adjusted for `window-width'."
-  (let ((thumbnail-width (or thumbnail-width (/ (window-width) 10)))
-	(title-width (or title-width (/ (window-width) 3)))
-	(channel-width (or channel-width (/ (window-width) 8)))
-	(views-width (or views-width (/ (window-width) 10)))
-	(duration-width (or duration-width (/ (window-width) 10)))
-	(date-width (or date-width (/ (window-width) 8))))
-    (setf tabulated-list-format
-          `[("Thumbnail" ,thumbnail-width nil)
-	    ("Title" ,title-width t)
-            ("Views" ,views-width yeetube--sort-views)
-            ("Duration" ,duration-width yeetube--sort-duration)
-	    ("Date" ,date-width yeetube--sort-date)
-            ("Channel" ,channel-width t)]
+(defun yeetube--tabulated-list-format (thumbnail-p)
+  "Return tabulated-list format vector.
+
+If THUMBNAIL-P is non-nil, add thumbnail."
+  (let ((list-format `[("Thumbnail"  ,(/ (window-width) 10) nil)
+		       ("Title" ,(/ (window-width) 3) t)
+		       ("Views" ,(/ (window-width) 10) yeetube--sort-views)
+		       ("Duration" ,(/ (window-width) 10)  yeetube--sort-duration)
+		       ("Date" ,(/ (window-width) 8) yeetube--sort-date)
+		       ("Channel" ,(/ (window-width) 8) t)]))
+    (if thumbnail-p list-format (cl-subseq list-format 1))))
+
+(defun yeetube-tabulated-list (&optional thumbnail-p)
+  "Return a tabulated list, adjusted for `window-width'
+
+If THUMBNAIL-P is non-nil, display thumbnails.."
+  (let ((thumbnail-p (or thumbnail-p yeetube-display-thumbnails-p)))
+    (setf tabulated-list-format (yeetube--tabulated-list-format thumbnail-p)
 	  tabulated-list-entries
-          (cl-map 'list
-                  (lambda (content)
-                    (list content
-                          (yeetube-propertize-vector content
-                                                     :image nil
+	  (cl-map 'list
+		  (lambda (content)
+		    (list content
+			  (yeetube-propertize-vector content
+						     :image nil
 						     :title 'yeetube-face-title
-                                                     :view-count 'yeetube-face-view-count
-                                                     :duration 'yeetube-face-duration
-                                                     :date 'yeetube-face-date
-                                                     :channel 'yeetube-face-channel)))
-                  yeetube-content)
-	  tabulated-list-sort-key (cons yeetube-default-sort-column
-					yeetube-default-sort-ascending))
+						     :view-count 'yeetube-face-view-count
+						     :duration 'yeetube-face-duration
+						     :date 'yeetube-face-date
+						     :channel 'yeetube-face-channel)))
+		  yeetube-content)
+	  tabulated-list-sort-key (cons yeetube-default-sort-column yeetube-default-sort-ascending))
     (tabulated-list-print)))
 
 (define-derived-mode yeetube-mode tabulated-list-mode "Yeetube"
