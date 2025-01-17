@@ -196,29 +196,15 @@ videos from.")
 (defvar yeetube--channel-id nil
   "Value of channel which `yeetube-channel-videos' used for.")
 
-(defun yeetube-get (keyword)
-  "Retrieve KEYWORD value for entry at point.
-
-Retrieve keyword value for entry at point, from `yeetube-content', in
-*yeetube* buffer.
-
-Keywords:
-- :title
-- :id
-- :type
-- :view-count
-- :duration
-- :channel"
-  (unless (keywordp keyword)
-    (error "Value `%s' is not a keyword" keyword))
-  (cl-getf (tabulated-list-get-id) keyword))
-
-(defun yeetube-get-url (id type)
-  "Get video or playlist url."
-  (format "%s%s" (if (eq type 'video)
-		     yeetube-video-url
-		   yeetube-playlist-url)
-          id))
+(defun yeetube-get-url (&optional id type)
+  "Get video or playlist url for entry ID, adjusted for TYPE."
+  (let* ((id (or id (tabulated-list-get-id)))
+	 (entry (cadr (assoc id yeetube-content)))
+	 (type (or type (aref entry (- (length entry) 1)))))
+    (format "%s%s" (if (eq type 'video)
+		       yeetube-video-url
+		     yeetube-playlist-url)
+	    id)))
 
 ;;;###autoload
 (defun yeetube-play ()
