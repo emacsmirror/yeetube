@@ -493,45 +493,51 @@ Image is inserted in BUFFER for ENTRY."
         (push id ids)
         (save-excursion
 	  ;; Scrape necessary data and push to list of contents
-          (let ((title (yeetube--scrape-string pos "title" (if videop "text" "simpleText")))
-                (view-count (when videop (yeetube--scrape-string pos "viewCountText" "simpleText")))
+          (let ((title (yeetube--scrape-string pos "title"
+					       (if videop "text"
+						 "simpleText")))
+                (view-count (when videop
+			      (yeetube--scrape-string pos "viewCountText" "simpleText")))
                 (duration (if videop
                               (yeetube--scrape-string pos "lengthText" "simpleText")
-                            (format "%s videos" (yeetube--scrape-string pos "videoCount"))))
+                            (format "%s videos"
+				    (yeetube--scrape-string pos "videoCount"))))
                 (channel (yeetube--scrape-string pos "longBylineText" "text"))
                 (channel-id (yeetube--scrape-string pos "canonicalBaseUrl"))
                 (thumbnail (yeetube--scrape-string pos "thumbnail" "url"))
-                (date (when videop (yeetube--scrape-string pos "publishedTimeText" "simpleText")))
-                (entry nil))
+                (date (when videop
+			(yeetube--scrape-string pos "publishedTimeText" "simpleText")))
+                (entry))
 	    (when (string= channel title) (setf channel yeetube--channel-id))
             (setq thumbnail (string-replace
                              "hq720" "default"
                              (substring thumbnail 0 (string-search "?" thumbnail))))
+	    ;; Create an entry with properties.
             (setq entry
-                  (list :title (if videop title (concat "Playlist: " title))
-                        :type (if videop 'video 'playlist)
-                        :id id
-                        :view-count (yeetube-view-count-format (or view-count ""))
-                        :duration duration
-                        :channel (propertize channel :channel-id channel-id)
-                        :thumbnail thumbnail
-                        :date (string-replace "Streamed " "" (or date ""))
-                        :image (if yeetube-display-thumbnails
-                                   (format "[[%s.jpg]]" id)
-                                 "disabled")))
-            (yeetube--retrieve-thumnail thumbnail entry "*yeetube*")
-            (push entry yeetube-content))))))
+                  (list id
+			(format "[[%s.jpg]]" id)
+			(propertize
+			 (if videop title (concat "Playlist: " title))
+			 'face 'yeetube-face-title)
+                        (propertize
+			 (yeetube-view-count-format (or view-count ""))
+			 'face 'yeetube-face-view-count)
+                        (propertize duration 'face 'yeetube-face-duration)
+			(propertize (string-replace "Streamed " "" (or date ""))
+				    'face 'yeetube-face-date)
+			(propertize channel 'face 'yeetube-face-channel)
+			channel-id
+			(if videop 'video 'playlist)))
+            (yeetube--retrieve-thumbnail thumbnail entry "*yeetube*")
+	    ;; Push entry in a format to be used with tabulated-list
+            (push (list (car entry) (if yeetube-display-thumbnails-p
+					(vconcat (cdr entry))
+				      (vconcat (cddr entry))))
+		  yeetube-content))))))
   ;; Reverse the list of entries before returning
   (cl-callf nreverse yeetube-content))
 
 (add-variable-watcher 'yeetube-saved-videos #'yeetube-update-saved-videos-list)
-
-;; View thumbnail using eww
-(defun yeetube-view-thumbnail ()
-  "Open URL using eww in a new buffer."
-  (interactive)
-  (eww-browse-url (yeetube-get :thumbnail)))
-
 
 ;; Yeetube Downlaod:
 
