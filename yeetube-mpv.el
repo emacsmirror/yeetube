@@ -36,7 +36,7 @@
   :type 'boolean
   :group 'yeetube)
 
-(defcustom yeetube-mpv-additional-flags nil
+(defcustom yeetube-mpv-additional-flags ""
   "Additional flags to pass to mpv."
   :type 'string
   :group 'yeetube)
