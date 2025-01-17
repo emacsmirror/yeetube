@@ -213,20 +213,22 @@ Keywords:
     (error "Value `%s' is not a keyword" keyword))
   (cl-getf (tabulated-list-get-id) keyword))
 
-(defun yeetube-get-url ()
+(defun yeetube-get-url (id type)
   "Get video or playlist url."
-  (format "%s%s"
-          (if (eq (yeetube-get :type) 'video)
-              yeetube-video-url
-            yeetube-playlist-url)
-          (yeetube-get :id)))
+  (format "%s%s" (if (eq type 'video)
+		     yeetube-video-url
+		   yeetube-playlist-url)
+          id))
 
 ;;;###autoload
 (defun yeetube-play ()
   "Play video at point in *yeetube* buffer."
   (interactive)
-  (let* ((video-url (yeetube-get-url))
-	 (video-title (yeetube-get :title))
+  (let* ((id (tabulated-list-get-id))
+	 (entry-content (cadr (assoc id yeetube-content)))
+	 (type (aref entry-content (- (length entry-content) 1)))
+	 (video-url (yeetube-get-url id type))
+	 (video-title (aref entry-content (if yeetube-display-thumbnails-p 1 0)))
          (proc (apply yeetube-play-function video-url
                       (when yeetube-mpv-modeline-mode (list video-title)))))
     (when (processp proc)
@@ -377,24 +379,22 @@ Image is inserted in BUFFER for ENTRY."
                   (with-silent-modifications
                     (save-excursion
                       (goto-char (point-min))
-                      (search-forward (format "[[%s.jpg]]" (plist-get entry :id)))
+                      (search-forward (format "[[%s.jpg]]" (car entry)))
                       ;; Ensure to remove the placeholder text
                       (delete-region (match-beginning 0) (match-end 0))
-                      (insert-image image)
-                      ;; Debugging Statement
-                      ;; (message "Inserted image for %s" (plist-get entry :title))
-                      (setf (aref (nth 0 (alist-get entry tabulated-list-entries)) 0) image))))))
+                      (insert-image image))))))
 	  (kill-buffer url-buffer)))))
 
-(defun yeetube--retrieve-thumnail (url str buffer)
+(defun yeetube--retrieve-thumbnail (url str buffer)
   "Retrieve thumbnail from URL and show it in place of STR in BUFFER."
   (let ((url-request-extra-headers yeetube-request-headers))
-    (if yeetube-enable-tor
-        (yeetube-with-tor-socks
-         (url-queue-retrieve url #'yeetube--image-callback `(,str ,buffer)
-                             'silent 'inhibit-cookies))
-      (url-queue-retrieve url #'yeetube--image-callback `(,str ,buffer)
-                          'silent 'inhibit-cookies))))
+    (when yeetube-display-thumbnails-p
+      (if yeetube-enable-tor
+          (yeetube-with-tor-socks
+           (url-queue-retrieve url #'yeetube--image-callback `(,str ,buffer)
+                               'silent 'inhibit-cookies))
+	(url-queue-retrieve url #'yeetube--image-callback `(,str ,buffer)
+                            'silent 'inhibit-cookies)))))
 
 (defun yeetube-read-query ()
   "Interactively read a search term."
@@ -407,17 +407,21 @@ Image is inserted in BUFFER for ENTRY."
   (yeetube-display-content-from-url
    (format "https://youtube.com/search?q=%s%s"
            (url-hexify-string query)
-           (if yeetube-filter (format "&sp=%s" (yeetube-get-filter-code yeetube-filter)) ""))))
+           (if yeetube-filter
+	       (format "&sp=%s" (yeetube-get-filter-code yeetube-filter))
+	     ""))))
 
 (defun yeetube-channel-id-at-point ()
   "Return yeetube channel id at point."
-  (if-let ((id (tabulated-list-get-id)))
-      (get-text-property 0 :channel-id (plist-get id :channel))
-    (user-error "No video at point")))
+  (let* ((id (tabulated-list-get-id))
+	 (content (cadr (assoc id yeetube-content)))
+	 (channel-id (aref content (- (length content) 2))))
+    channel-id))
 
 (defun yeetube-channel-videos (&optional channel-id)
   "View videos for the channel with CHANNEL-ID."
-  (interactive (list (or (yeetube-channel-id-at-point) (format "@%s" (read-string "Channel: ")))))
+  (interactive (list (or (yeetube-channel-id-at-point)
+			 (format "@%s" (read-string "Channel: ")))))
   (setf yeetube--channel-id (substring channel-id 2))
   (yeetube-display-content-from-url (format "https://youtube.com/%s/videos" channel-id)))
 
@@ -586,12 +590,16 @@ Optional values:
 Content will be downloaded at `yeetube-download-directory'.
 Optionally, provide custom own URL."
   (interactive)
-  (let ((url (or url (yeetube-get-url))))
+  (let* ((id (tabulated-list-get-id))
+	 (entry-content (cadr (assoc id yeetube-content)))
+	 (type (aref entry-content (- (length entry-content) 1)))
+	 (url (or (yeetube-get-url id type) url))
+	 (title (or (aref entry-content 0) "Unknown")))
     (when (string-prefix-p "http" url)
       (let ((default-directory yeetube-download-directory))
         (yeetube-download--ytdlp url nil yeetube-download-audio-format)
         (message "Downloading: '%s' at '%s'"
-		 (yeetube-get :title) yeetube-download-directory)))))
+		 title yeetube-download-directory)))))
 
 ;; TODO: Add option to use ffmpeg
 ;;;###autoload
@@ -608,7 +616,8 @@ prompt blank to keep the default name."
     (cl-loop
      for url = (read-string "Enter URL (q to quit): ")
      until (string= url "q")
-     do (let ((name (read-string (format "Custom name (download counter: %d) " download-counter))))
+     do (let ((name (read-string (format "Custom name (download counter: %d) "
+					 download-counter))))
           (yeetube-download--ytdlp url name yeetube-download-audio-format)
           (cl-incf download-counter)))))
 
@@ -638,7 +647,6 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
   "s" #'yeetube-save-video
   "P" #'yeetube-play-saved-video
   "r" #'yeetube-replay
-  "t" #'yeetube-view-thumbnail
   "T" #'yeetube-mpv-toggle-torsocks
   "C-q" #'yeetube-mpv-change-video-quality
   "q" #'quit-window)
@@ -670,15 +678,16 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
   (let* ((split-date (split-string date " "))
          (value (string-to-number (nth 0 split-date)))
          (unit (nth 1 split-date))
-         (seconds-per-unit (cond
-                            ((or (string= "second" unit) (string= "seconds" unit)) 1)
-                            ((or (string= "minute" unit) (string= "minutes" unit)) 60)
-                            ((or (string= "hour" unit) (string= "hours" unit)) (* 60 60))
-                            ((or (string= "day" unit) (string= "days" unit)) (* 60 60 24))
-                            ((or (string= "week" unit) (string= "weeks" unit)) (* 60 60 24 7))
-                            ((or (string= "month" unit) (string= "months" unit)) (* 60 60 24 30))
-                            ((or (string= "year" unit) (string= "years" unit)) (* 60 60 24 365))
-                            (t 0))))
+         (seconds-per-unit
+	  (cond
+           ((or (string= "second" unit) (string= "seconds" unit)) 1)
+           ((or (string= "minute" unit) (string= "minutes" unit)) 60)
+           ((or (string= "hour" unit) (string= "hours" unit)) (* 60 60))
+           ((or (string= "day" unit) (string= "days" unit)) (* 60 60 24))
+           ((or (string= "week" unit) (string= "weeks" unit)) (* 60 60 24 7))
+           ((or (string= "month" unit) (string= "months" unit)) (* 60 60 24 30))
+           ((or (string= "year" unit) (string= "years" unit)) (* 60 60 24 365))
+           (t 0))))
     (* value seconds-per-unit)))
 
 (defun yeetube--sort-date (a b)
@@ -705,19 +714,9 @@ If THUMBNAIL-P is non-nil, add thumbnail."
 If THUMBNAIL-P is non-nil, display thumbnails.."
   (let ((thumbnail-p (or thumbnail-p yeetube-display-thumbnails-p)))
     (setf tabulated-list-format (yeetube--tabulated-list-format thumbnail-p)
-	  tabulated-list-entries
-	  (cl-map 'list
-		  (lambda (content)
-		    (list content
-			  (yeetube-propertize-vector content
-						     :image nil
-						     :title 'yeetube-face-title
-						     :view-count 'yeetube-face-view-count
-						     :duration 'yeetube-face-duration
-						     :date 'yeetube-face-date
-						     :channel 'yeetube-face-channel)))
-		  yeetube-content)
-	  tabulated-list-sort-key (cons yeetube-default-sort-column yeetube-default-sort-ascending))
+	  tabulated-list-entries yeetube-content
+	  tabulated-list-sort-key
+	  (cons yeetube-default-sort-column yeetube-default-sort-ascending))
     (tabulated-list-print)))
 
 (define-derived-mode yeetube-mode tabulated-list-mode "Yeetube"
