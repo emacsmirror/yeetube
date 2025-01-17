@@ -212,8 +212,7 @@ videos from.")
   (interactive)
   (let* ((id (tabulated-list-get-id))
 	 (entry-content (cadr (assoc id yeetube-content)))
-	 (type (aref entry-content (- (length entry-content) 1)))
-	 (video-url (yeetube-get-url id type))
+	 (video-url (yeetube-get-url id))
 	 (video-title (aref entry-content (if yeetube-display-thumbnails-p 1 0)))
          (proc (apply yeetube-play-function video-url
                       (when yeetube-mpv-modeline-mode (list video-title)))))
@@ -230,7 +229,9 @@ Select entry title from `yeetube-history' and play corresponding URL."
   (interactive)
   (let* ((titles (mapcar (lambda (entry) (cl-getf entry :title)) yeetube-history))
          (selected (completing-read "Replay: " titles))
-         (selected-entry (cl-find-if (lambda (entry) (string= selected (cl-getf entry :title))) yeetube-history))
+         (selected-entry (cl-find-if (lambda (entry)
+				       (string= selected (cl-getf entry :title)))
+				     yeetube-history))
 	 (title (cl-getf selected-entry :title))
          (url (cl-getf selected-entry :url)))
     (funcall yeetube-play-function url (when yeetube-mpv-modeline-mode title))
@@ -248,12 +249,14 @@ Select entry title from `yeetube-history' and play corresponding URL."
       (write-region "nil" nil file-path))))
 
 ;;;###autoload
-(defun yeetube-save-video ()
-  "Save url at point."
-  (interactive)
+(defun yeetube-save-video (arg)
+  "Save url at point.
+
+If ARG is non-nil, save as a playlist URL."
+  (interactive "P")
   (yeetube-load-saved-videos)
   (let ((name (read-string "Save as: "))
-	(url (yeetube-get-url)))
+	(url (yeetube-get-url (tabulated-list-get-id) (if arg 'playlist 'video))))
     (push (cons name url) yeetube-saved-videos)))
 
 ;; We could use keywords here, but it would break users saved videos
