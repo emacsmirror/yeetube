@@ -4,14 +4,11 @@
 
 * Sources
 + [[https://git.thanosapollo.org/yeetube][Upstream]]
++ [[https://codeberg.org/ThanosApollo/emacs-yeetube][Codeberg]] (mirror)
 
 * How To Contribute
 
-Before starting to work on any big feature, that is not mentioned on
-the [[file:TODO.org][TODOs]], I recommend you to send me an email first.
-
-** How to submit a PR?
-+ Feel free to send me a patch, here's how to create one
+** How to send a patch?
 
 #+begin_src bash
 $ git clone https://git.thanosapollo.com/<repo>.git && cd <repo>
