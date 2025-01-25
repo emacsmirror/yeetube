@@ -417,6 +417,13 @@ Image is inserted in BUFFER for ENTRY."
   (setf yeetube--channel-id (substring channel-id 2))
   (yeetube-display-content-from-url (format "https://youtube.com/%s/videos" channel-id)))
 
+(defun yeetube-channel-streams (&optional channel-id)
+  "View streams for the channel with CHANNEL-ID."
+  (interactive (list (or (yeetube-channel-id-at-point)
+			 (format "@%s" (read-string "Channel: ")))))
+  (setf yeetube--channel-id (substring channel-id 2))
+  (yeetube-display-content-from-url (format "https://youtube.com/%s/streams" channel-id)))
+
 (defun yeetube-channel-search (channel-id query)
   "Search channel with CHANNEL-ID for videoes matching QUERY."
   (interactive (list (yeetube-channel-id-at-point) (yeetube-read-query)))
@@ -475,7 +482,8 @@ Image is inserted in BUFFER for ENTRY."
   (setf yeetube-content nil)
   (goto-char (point-min))
   (let ((count 0)
-        (result-rx (rx "\"" (or "video" (and (or "playlist" "compact") (? "Video"))) "Renderer\""))
+        (result-rx
+	 (rx "\"" (or "video" (and (or "playlist" "compact") (? "Video"))) "Renderer\""))
         id ids videop pos)
     ;; Keep scraping while there are results and the limit is not reached
     (while (and (< count yeetube-results-limit)
@@ -566,7 +574,8 @@ Optional values:
   (let* ((tor-command (when yeetube-enable-tor (executable-find "torsocks")))
          (name-command (when name (format "-o %s" (shell-quote-argument name))))
          (format-command (when audio-format
-			   (format "--extract-audio --audio-format %s" (shell-quote-argument audio-format))))
+			   (format "--extract-audio --audio-format %s"
+				   (shell-quote-argument audio-format))))
          (command (mapconcat 'identity (delq nil
 					     (list tor-command
 						   (executable-find "yt-dlp")
@@ -637,6 +646,7 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
   "v" #'yeetube-mpv-toggle-video
   "V" #'yeetube-mpv-toggle-no-video-flag
   "s" #'yeetube-save-video
+  "S" #'yeetube-channel-streams
   "P" #'yeetube-play-saved-video
   "r" #'yeetube-replay
   "T" #'yeetube-mpv-toggle-torsocks
