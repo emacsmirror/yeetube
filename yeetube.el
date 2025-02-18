@@ -117,6 +117,11 @@ Valid options include:
   :type 'boolean
   :group 'yeetube)
 
+(defcustom yeetube-pop-to-same-window-p t
+  "When non-nil, create *yeetube* buffer at the same window."
+  :type 'boolean
+  :group 'yeetube)
+
 (defgroup yeetube-faces nil
   "Faces used by yeetube."
   :group 'yeetube
@@ -332,7 +337,10 @@ WHERE indicates where in the buffer the update should happen."
 
 (defun yeetube--callback (status)
   "Yeetube callback handling STATUS."
-  (let ((url-buffer (current-buffer)))
+  (let ((url-buffer (current-buffer))
+	(pop-to-buffer-func (if yeetube-pop-to-same-window-p
+				#'pop-to-buffer-same-window
+			      #'pop-to-buffer)))
     (unwind-protect
         (if-let ((err (plist-get :error status)))
             (message "Error %s in retrieving yeetube results: %S" (car err) (cdr err))
@@ -341,7 +349,7 @@ WHERE indicates where in the buffer the update should happen."
             (url-insert url-buffer)
             (decode-coding-region (point-min) (point-max) 'utf-8)
             (yeetube-get-content))
-          (pop-to-buffer-same-window "*yeetube*")
+          (funcall pop-to-buffer-func "*yeetube*")
           (yeetube-mode))
       (kill-buffer url-buffer))))
 
