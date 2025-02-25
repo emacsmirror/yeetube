@@ -404,6 +404,10 @@ Image is inserted in BUFFER for ENTRY."
 (defun yeetube-search (query)
   "Search for QUERY."
   (interactive (list (yeetube-read-query)))
+  (pop-to-buffer-same-window "*yeetube*")
+  (let ((inhibit-read-only t))
+    (erase-buffer)
+    (insert (propertize "Loading..." 'face 'bold-italic)))
   (yeetube-display-content-from-url
    (format "https://youtube.com/search?q=%s%s"
            (url-hexify-string query)
