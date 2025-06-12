@@ -603,16 +603,19 @@ Optional values:
 Content will be downloaded at `yeetube-download-directory'.
 Optionally, provide custom own URL."
   (interactive)
-  (let* ((id (tabulated-list-get-id))
-	 (entry-content (cadr (assoc id yeetube-content)))
-	 (type (aref entry-content (- (length entry-content) 1)))
-	 (url (or (yeetube-get-url id type) url))
-	 (title (or (aref entry-content 0) "Unknown")))
-    (when (string-prefix-p "http" url)
-      (let ((default-directory yeetube-download-directory))
-        (yeetube-download--ytdlp url nil yeetube-download-audio-format)
-        (message "Downloading: '%s' at '%s'"
-		 title yeetube-download-directory)))))
+  (save-excursion
+    ;; When point is on thumbnail, id will be nil.
+    (and (null (tabulated-list-get-id)) (end-of-line))
+    (let* ((id (tabulated-list-get-id))
+	   (entry-content (cadr (assoc id yeetube-content)))
+	   (type (aref entry-content (- (length entry-content) 1)))
+	   (url (or (yeetube-get-url id type) url))
+	   (title (or (aref entry-content 1) "Unknown")))
+      (when (string-prefix-p "http" url)
+	(let ((default-directory yeetube-download-directory))
+          (yeetube-download--ytdlp url nil yeetube-download-audio-format)
+          (message "Downloading: '%s' at '%s'"
+		   title yeetube-download-directory))))))
 
 ;; TODO: Add option to use ffmpeg
 ;;;###autoload
