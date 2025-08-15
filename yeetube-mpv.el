@@ -36,9 +36,9 @@
   :type 'boolean
   :group 'yeetube)
 
-(defcustom yeetube-mpv-additional-flags ""
+(defcustom yeetube-mpv-additional-flags '("")
   "Additional flags to pass to mpv."
-  :type 'string
+  :type '(repeat string)
   :group 'yeetube)
 
 (defvar yeetube-mpv-torsocks (executable-find "torsocks")
