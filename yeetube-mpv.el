@@ -26,11 +26,6 @@
 
 ;;; Code:
 
-(defcustom yeetube-mpv-disable-video nil
-  "Add no-video flag when using mpv."
-  :type 'boolean
-  :group 'yeetube)
-
 (defcustom yeetube-mpv-enable-torsocks nil
   "Enable torsocks."
   :type 'boolean
@@ -102,18 +97,19 @@ INFO: Information to display with `yeetube-mpv-modeline-mode'
 
 This function is not specific to just playing urls.  Feel free to use
 to play local files."
-  (let ((yeetube-mpv-path (executable-find "mpv")))
-    (yeetube-mpv-process
-     (concat (when yeetube-mpv-enable-torsocks
-	       (concat yeetube-mpv-torsocks " "))
-	     yeetube-mpv-path " --ytdl-format="
-	     (yeetube-mpv-ytdl-format-video-quality yeetube-mpv-video-quality)
-	     " "
-	     (shell-quote-argument input)
-	     (when yeetube-mpv-disable-video " --no-video")
-	     yeetube-mpv-additional-flags))
+  (let* ((yeetube-mpv-path (executable-find "mpv"))
+	 (yeetube-command
+	  (concat (when yeetube-mpv-enable-torsocks (concat yeetube-mpv-torsocks " "))
+		  yeetube-mpv-path " --ytdl-format="
+		  (yeetube-mpv-ytdl-format-video-quality yeetube-mpv-video-quality)
+		  " "
+		  (shell-quote-argument input)
+		  " "
+		  (mapconcat #'identity yeetube-mpv-additional-flags " "))))
+    (yeetube-mpv-process yeetube-command)
+    (message "Yeetube command: %s" yeetube-command)
     (message (if yeetube-mpv-enable-torsocks
-		 "yeetube: Starting mpv process (using torsocks)"
+		 "yeetube: Starting mpv process (Using Torsocks)"
 	       "yeetube: Starting mpv process"))
     (setf yeetube-mpv-currently-playing (format "[%s]" info))))
 
@@ -140,10 +136,11 @@ To use this mode, you should set `yeetube-play-function' to
 (defun yeetube-mpv-toggle-no-video-flag ()
   "Toggle no video flag for mpv player."
   (interactive)
-  (if yeetube-mpv-disable-video
-      (progn (setf yeetube-mpv-disable-video nil)
+  (if (member "--no-video" yeetube-mpv-additional-flags)
+      (progn (setf yeetube-mpv-additional-flags
+		   (remove "--no-video" yeetube-mpv-additional-flags))
 	     (message "yeetube: mpv enabled video"))
-    (setf yeetube-mpv-disable-video t)
+    (push "--no-video" yeetube-mpv-additional-flags)
     (message "yeetube: mpv disabled video")))
 
 (defun yeetube-mpv-send-keypress (key)
