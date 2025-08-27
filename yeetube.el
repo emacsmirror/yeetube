@@ -230,6 +230,15 @@ videos from.")
     (message "Playing: %s" video-title)))
 
 ;;;###autoload
+(defun yeetube-copy-url ()
+  "Copy entry URL at point."
+  (interactive)
+  (cl-assert (derived-mode-p 'yeetube-mode) nil "Yeetube mode not enabled")
+  (let ((url (yeetube-get-url)))
+    (kill-new url)
+    (message "Copied url: %s" url)))
+
+;;;###autoload
 (defun yeetube-replay ()
   "Select entry from history to replay.
 
@@ -657,6 +666,7 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
   "C-<return>" #'yeetube-video-or-playlist-page
   "b" #'yeetube-browse-url
   "c" #'yeetube-channel-videos
+  "C" #'yeetube-copy-url
   "d" #'yeetube-download-video
   "D" #'yeetube-download-change-directory
   "a" #'yeetube-download-change-audio-format
