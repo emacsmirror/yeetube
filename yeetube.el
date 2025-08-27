@@ -203,7 +203,9 @@ videos from.")
 
 (defun yeetube-get-url (&optional id type)
   "Get video or playlist url for entry ID, adjusted for TYPE."
-  (let* ((id (or id (tabulated-list-get-id)))
+  ;; When point is on thumbnail, id will be nil.
+  (let* ((id (or id (tabulated-list-get-id)
+		 (save-excursion (end-of-line) (tabulated-list-get-id))))
 	 (entry (cadr (assoc id yeetube-content)))
 	 (type (or type (aref entry (- (length entry) 1)))))
     (format "%s%s" (if (eq type 'video)
