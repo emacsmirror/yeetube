@@ -217,19 +217,17 @@ videos from.")
 (defun yeetube-play ()
   "Play video at point in *yeetube* buffer."
   (interactive)
-  (save-excursion
-    ;; When point is on thumbnail, id will be nil.
-    (and (null (tabulated-list-get-id)) (end-of-line))
-    (let* ((id (tabulated-list-get-id))
-	   (entry-content (cadr (assoc id yeetube-content)))
-	   (video-url (yeetube-get-url id))
-	   (video-title (aref entry-content (if yeetube-display-thumbnails-p 1 0)))
-	   (proc (apply yeetube-play-function video-url
-			(when yeetube-mpv-modeline-mode (list video-title)))))
-      (when (processp proc)
-	(process-put proc :now-playing video-title))
-      (push (list :url video-url :title video-title) yeetube-history)
-      (message "Playing: %s" video-title))))
+  (let* ((id (or (tabulated-list-get-id) (save-excursion (end-of-line)
+							 (tabulated-list-get-id))))
+	 (entry-content (cadr (assoc id yeetube-content)))
+	 (video-url (yeetube-get-url id))
+	 (video-title (aref entry-content (if yeetube-display-thumbnails-p 1 0)))
+	 (proc (apply yeetube-play-function video-url
+		      (when yeetube-mpv-modeline-mode (list video-title)))))
+    (when (processp proc)
+      (process-put proc :now-playing video-title))
+    (push (list :url video-url :title video-title) yeetube-history)
+    (message "Playing: %s" video-title)))
 
 ;;;###autoload
 (defun yeetube-replay ()
