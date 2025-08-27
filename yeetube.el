@@ -355,11 +355,12 @@ WHERE indicates where in the buffer the update should happen."
 
 (defun yeetube-display-content-from-url (url)
   "Display the video results from URL."
-  (let ((url-request-extra-headers yeetube-request-headers))
-    (if yeetube-enable-tor
-        (yeetube-with-tor-socks
-         (url-retrieve url #'yeetube--callback nil 'silent 'inhibit-cookies))
-      (url-retrieve url #'yeetube--callback nil 'silent 'inhibit-cookies))))
+  (with-current-buffer "*yeetube*"
+    (let ((url-request-extra-headers yeetube-request-headers))
+      (if yeetube-enable-tor
+          (yeetube-with-tor-socks
+           (url-retrieve url #'yeetube--callback nil 'silent 'inhibit-cookies))
+	(url-retrieve url #'yeetube--callback nil 'silent 'inhibit-cookies)))))
 
 (defun yeetube--image-callback (status entry buffer)
   "Yeetube callback for thumbnail images handling STATUS.
@@ -426,8 +427,10 @@ Image is inserted in BUFFER for ENTRY."
   "View videos for the channel with CHANNEL-ID."
   (interactive (list (or (yeetube-channel-id-at-point)
 			 (format "@%s" (read-string "Channel: ")))))
-  (setf yeetube--channel-id (substring channel-id 2))
-  (yeetube-display-content-from-url (format "https://youtube.com/%s/videos" channel-id)))
+  (with-current-buffer (get-buffer-create "*yeetube*")
+    (setf yeetube--channel-id (substring channel-id 2))
+    (yeetube-display-content-from-url
+     (format "https://youtube.com/%s/videos" channel-id))))
 
 (defun yeetube-channel-streams (&optional channel-id)
   "View streams for the channel with CHANNEL-ID."
