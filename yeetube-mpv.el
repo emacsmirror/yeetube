@@ -84,7 +84,7 @@ Accepted values include: 1080, 720, 480, 360, 240, 144")
     (sit-for 0.1)
     (unless (get-process yeetube-mpv-process)
       (start-process-shell-command
-       "yeetube" nil command))))
+       "yeetube" "*yeetube-output*" command))))
 
 (defun yeetube-mpv-ytdl-format-video-quality (resolution)
   "Return shell quoted argument for ytdlp with RESOLUTION."
