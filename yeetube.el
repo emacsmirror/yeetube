@@ -38,6 +38,7 @@
 ;;; Code:
 
 (require 'compat)
+(require 'image)
 (require 'url)
 (require 'tabulated-list)
 (require 'cl-lib)
