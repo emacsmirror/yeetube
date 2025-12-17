@@ -731,7 +731,7 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
   "Return tabulated-list format vector.
 
 If THUMBNAIL-P is non-nil, add thumbnail."
-  (let ((list-format `[("Thumbnail"  ,(/ (window-width) 10) nil)
+  (let ((list-format `[("Thumbnail"  ,(ceiling (/ (float (car yeetube-thumbnail-size)) (frame-char-width))) nil)
 		       ("Title" ,(/ (window-width) 3) t)
 		       ("Views" ,(/ (window-width) 10) yeetube--sort-views)
 		       ("Duration" ,(/ (window-width) 10)  yeetube--sort-duration)
