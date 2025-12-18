@@ -93,10 +93,11 @@ Accepted values include: 1080, 720, 480, 360, 240, 144")
 (defun yeetube-mpv-play (input &optional info)
   "Start yeetube process to play INPUT using mpv.
 
-INFO: Information to display with `yeetube-mpv-modeline-mode'
+INPUT can be a URL or a local file path.
+INFO is optional information to display with `yeetube-mpv-modeline-mode'.
 
-This function is not specific to just playing urls.  Feel free to use
-to play local files."
+This function is not specific to just playing URLs.  Feel free to use
+it to play local files."
   (let* ((yeetube-mpv-path (executable-find "mpv"))
 	 (yeetube-command
 	  (concat (when yeetube-mpv-enable-torsocks (concat yeetube-mpv-torsocks " "))

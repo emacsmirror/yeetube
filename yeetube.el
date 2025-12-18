@@ -78,7 +78,7 @@
   :group 'yeetube)
 
 (defcustom yeetube-download-directory (or (xdg-user-dir "DOWNLOAD") (getenv "HOME"))
-  "Default directory to downlaod videos."
+  "Default directory to download videos."
   :type 'string
   :group 'yeetube)
 
@@ -171,7 +171,7 @@ Valid options include:
 
 (defvar yeetube-invidious-instances
   '("vid.puffyan.us" "inv.nadeko.net" "invidious.flokinet.to")
-  "List of invidious instaces.")
+  "List of invidious instances.")
 
 (defvar yeetube-content nil
   "Scraped content.")
@@ -291,7 +291,6 @@ If ARG is non-nil, save as a playlist URL."
     (message "Playing: %s" (car (assoc video yeetube-saved-videos)))))
 
 ;;;###autoload
-
 (defun yeetube-remove-saved-video ()
   "Select video to remove from saved videos."
   (interactive)
@@ -301,19 +300,19 @@ If ARG is non-nil, save as a playlist URL."
 
 ;;;###autoload
 (defun yeetube-remove-all-saved-videos ()
-  "Clear yeetube saved."
+  "Clear all saved videos from yeetube."
   (interactive)
   (let ((clear-saved (y-or-n-p "Delete saved?")))
     (when clear-saved
       (setf yeetube-saved-videos nil))))
 
 (defun yeetube-update-saved-videos-list (_symbol new-value _where _environment)
-  "Updated saved videos.
+  "Update saved videos list file.
 
-SYMBOL-NAME is the name of the symbol to update.
-NEW-VALUE is the new value for the symbol.
-OPERATION is the operation to perform.
-WHERE indicates where in the buffer the update should happen."
+This is a variable watcher function that writes NEW-VALUE to the saved
+videos file whenever `yeetube-saved-videos' changes.  _SYMBOL is the
+variable being watched, _WHERE indicates the type of change, and
+_ENVIRONMENT is the lexical environment."
   (with-temp-buffer (find-file (concat user-emacs-directory "yeetube"))
 		    (erase-buffer)
 		    (setf yeetube-saved-videos new-value)
@@ -450,7 +449,7 @@ Image is inserted in BUFFER for ENTRY."
   (yeetube-display-content-from-url (format "https://youtube.com/%s/streams" channel-id)))
 
 (defun yeetube-channel-search (channel-id query)
-  "Search channel with CHANNEL-ID for videoes matching QUERY."
+  "Search channel with CHANNEL-ID for videos matching QUERY."
   (interactive (list (yeetube-channel-id-at-point) (yeetube-read-query)))
   (yeetube-display-content-from-url
    (format "https://youtube.com/%s/search?query=%s"
@@ -568,7 +567,7 @@ Image is inserted in BUFFER for ENTRY."
 
 (add-variable-watcher 'yeetube-saved-videos #'yeetube-update-saved-videos-list)
 
-;; Yeetube Downlaod:
+;; Yeetube Download:
 
 (defvar yeetube-ytdlp (executable-find "yt-dlp")
   "Path for yt-dlp executable.")
@@ -740,9 +739,9 @@ If THUMBNAIL-P is non-nil, add thumbnail."
     (if thumbnail-p list-format (cl-subseq list-format 1))))
 
 (defun yeetube-tabulated-list (&optional thumbnail-p)
-  "Return a tabulated list, adjusted for `window-width'
+  "Return a tabulated list, adjusted for `window-width'.
 
-If THUMBNAIL-P is non-nil, display thumbnails.."
+If THUMBNAIL-P is non-nil, display thumbnails."
   (let ((thumbnail-p (or thumbnail-p yeetube-display-thumbnails-p)))
     (setf tabulated-list-format (yeetube--tabulated-list-format thumbnail-p)
 	  tabulated-list-entries yeetube-content
