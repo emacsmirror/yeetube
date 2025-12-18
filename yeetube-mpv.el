@@ -62,10 +62,10 @@ Accepted values include: 1080, 720, 480, 360, 240, 144")
 (defun yeetube-mpv-toggle-torsocks ()
   "Toggle torsocks."
   (interactive)
-  (pcase yeetube-mpv-torsocks
-    ('t (setf yeetube-mpv-torsocks nil)
+  (pcase yeetube-mpv-enable-torsocks
+    ('t (setf yeetube-mpv-enable-torsocks nil)
 	(message "yeetube: Torsocks disabled"))
-    ('nil (setf yeetube-mpv-torsocks t)
+    ('nil (setf yeetube-mpv-enable-torsocks t)
 	  (message "yeetube: Torsocks enabled"))))
 
 (defun yeetube-mpv-check ()
