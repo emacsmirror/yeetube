@@ -26,6 +26,15 @@
 
 ;;; Code:
 
+;; silence byte-compiler
+(defvar yeetube-ytdlp-program)
+(defvar yeetube-torsocks-program)
+
+(defcustom yeetube-mpv-program (executable-find "mpv")
+  "Path for mpv executable."
+  :type 'string
+  :group 'yeetube)
+
 (defcustom yeetube-mpv-enable-torsocks nil
   "Enable torsocks."
   :type 'boolean
@@ -35,9 +44,6 @@
   "Additional flags to pass to mpv."
   :type '(repeat string)
   :group 'yeetube)
-
-(defvar yeetube-mpv-torsocks (executable-find "torsocks")
-  "Path to torsocks executable.")
 
 (defvar yeetube-mpv-video-quality "720"
   "Video resolution/quality.
@@ -70,8 +76,7 @@ Accepted values include: 1080, 720, 480, 360, 240, 144")
 
 (defun yeetube-mpv-check ()
   "Check if mpv and yt-dlp is installed."
-  (unless (and (executable-find "mpv")
-	       (executable-find "yt-dlp"))
+  (unless (and yeetube-mpv-program yeetube-ytdlp-program)
     (error "Unable to play video.  Please install `yt-dlp' and `mpv'")))
 
 (defun yeetube-mpv-process (command)
@@ -98,10 +103,9 @@ INFO is optional information to display with `yeetube-mpv-modeline-mode'.
 
 This function is not specific to just playing URLs.  Feel free to use
 it to play local files."
-  (let* ((yeetube-mpv-path (executable-find "mpv"))
-	 (yeetube-command
-	  (concat (when yeetube-mpv-enable-torsocks (concat yeetube-mpv-torsocks " "))
-		  yeetube-mpv-path " --ytdl-format="
+  (let* ((yeetube-command
+	  (concat (when yeetube-mpv-enable-torsocks (concat yeetube-torsocks-program " "))
+		  yeetube-mpv-program " --ytdl-format="
 		  (yeetube-mpv-ytdl-format-video-quality yeetube-mpv-video-quality)
 		  " "
 		  (shell-quote-argument input)

@@ -54,6 +54,16 @@
   :group 'external
   :prefix "yeetube-")
 
+(defcustom yeetube-torsocks-program (executable-find "torsocks")
+  "Path for torsocks executable."
+  :type 'string
+  :group 'yeetube)
+
+(defcustom yeetube-ytdlp-program (executable-find "yt-dlp")
+  "Path for yt-dlp executable."
+  :type 'string
+  :group 'yeetube)
+
 (defcustom yeetube-results-limit 20
   "Define a limit for search results."
   :type 'number
@@ -569,9 +579,6 @@ Image is inserted in BUFFER for ENTRY."
 
 ;; Yeetube Download:
 
-(defvar yeetube-ytdlp (executable-find "yt-dlp")
-  "Path for yt-dlp executable.")
-
 ;;;###autoload
 (defun yeetube-download-change-directory ()
   "Change download directory."
@@ -593,16 +600,16 @@ Image is inserted in BUFFER for ENTRY."
 Optional values:
  NAME for custom file name.
  AUDIO-FORMAT to extract and keep contents as specified audio-format only."
-  (unless (executable-find "yt-dlp")
-    (error "Executable for yt-dlp not found.  Please install yt-dlp"))
-  (let* ((tor-command (when yeetube-enable-tor (executable-find "torsocks")))
+  (unless yeetube-ytdlp-program
+    (error "Executable for yt-dlp not found. Please set yeetube-ytdlp-program"))
+  (let* ((tor-command (when yeetube-enable-tor yeetube-torsocks-program))
          (name-command (when name (format "-o %s" (shell-quote-argument name))))
          (format-command (when audio-format
 			   (format "--extract-audio --audio-format %s"
 				   (shell-quote-argument audio-format))))
          (command (mapconcat 'identity (delq nil
 					     (list tor-command
-						   (executable-find "yt-dlp")
+						   yeetube-ytdlp-program
 						   (shell-quote-argument url)
 						   name-command format-command))
 			     " ")))
