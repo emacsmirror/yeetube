@@ -386,10 +386,10 @@ _ENVIRONMENT is the lexical environment."
 Image is inserted in BUFFER for ENTRY."
   (let ((url-buffer (current-buffer)))
     (unwind-protect
-        (if-let ((err (plist-get status :error)))
+        (if-let* ((err (plist-get status :error)))
             (message "Error %s in retrieving a thumbnail: %S" (car err) (cdr err))
-          (if-let ((handle (mm-dissect-buffer t))
-                   (image (mm-get-image handle)))
+          (if-let* ((handle (mm-dissect-buffer t))
+                    (image (mm-get-image handle)))
               (progn
                 (setf (image-property image :max-width) (car yeetube-thumbnail-size)
                       (image-property image :max-height) (cdr yeetube-thumbnail-size))
