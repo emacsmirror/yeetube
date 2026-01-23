@@ -215,8 +215,7 @@ videos from.")
 (defun yeetube-get-url (&optional id type)
   "Get video or playlist url for entry ID, adjusted for TYPE."
   ;; When point is on thumbnail, id will be nil.
-  (let* ((id (or id (tabulated-list-get-id)
-		 (save-excursion (end-of-line) (tabulated-list-get-id))))
+  (let* ((id (or id (tabulated-list-get-id)))
 	 (entry (cadr (assoc id yeetube-content)))
 	 (type (or type (aref entry (- (length entry) 1)))))
     (format "%s%s" (if (eq type 'video)
@@ -228,8 +227,7 @@ videos from.")
 (defun yeetube-play ()
   "Play video at point in *yeetube* buffer."
   (interactive)
-  (let* ((id (or (tabulated-list-get-id) (save-excursion (end-of-line)
-							 (tabulated-list-get-id))))
+  (let* ((id (tabulated-list-get-id))
 	 (entry-content (cadr (assoc id yeetube-content)))
 	 (video-url (yeetube-get-url id))
 	 (video-title (aref entry-content (if yeetube-display-thumbnails-p 1 0)))
@@ -400,9 +398,8 @@ Image is inserted in BUFFER for ENTRY."
                     (save-excursion
                       (goto-char (point-min))
                       (search-forward (format "[[%s.jpg]]" (car entry)))
-                      ;; Ensure to remove the placeholder text
-                      (delete-region (match-beginning 0) (match-end 0))
-                      (insert-image image))))))
+                      (add-text-properties (match-beginning 0) (match-end 0)
+                                           `(display ,image)))))))
 	  (kill-buffer url-buffer)))))
 
 (defun yeetube--retrieve-thumbnail (url str buffer)
@@ -623,8 +620,6 @@ Content will be downloaded at `yeetube-download-directory'.
 Optionally, provide custom own URL."
   (interactive)
   (save-excursion
-    ;; When point is on thumbnail, id will be nil.
-    (and (null (tabulated-list-get-id)) (end-of-line))
     (let* ((id (tabulated-list-get-id))
 	   (entry-content (cadr (assoc id yeetube-content)))
 	   (type (aref entry-content (- (length entry-content) 1)))
