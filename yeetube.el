@@ -512,6 +512,8 @@ Image is inserted in BUFFER for ENTRY."
   "Get content from youtube."
   (setf yeetube-content nil)
   (goto-char (point-min))
+  (search-forward "ytInitialData")
+  (search-forward "\"contents\"")
   (let ((count 0)
         (result-rx
 	 (rx "\"" (or "video" (and (or "playlist" "compact") (? "Video"))) "Renderer\""))
