@@ -357,7 +357,7 @@ _ENVIRONMENT is the lexical environment."
 				#'pop-to-buffer-same-window
 			      #'pop-to-buffer)))
     (unwind-protect
-        (if-let* ((err (plist-get :error status)))
+        (if-let* ((err (plist-get status :error)))
             (message "Error %s in retrieving yeetube results: %S" (car err) (cdr err))
           (with-temp-buffer
             (set-buffer-multibyte t)
