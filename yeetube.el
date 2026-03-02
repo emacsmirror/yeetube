@@ -685,8 +685,9 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
 
 (defun yeetube--sort-views (a b)
   "Sort entries A and B by view count."
-  (let ((views-a (string-to-number (replace-regexp-in-string "," "" (aref (cadr a) 2))))
-        (views-b (string-to-number (replace-regexp-in-string "," "" (aref (cadr b) 2)))))
+  (let* ((idx (if yeetube-display-thumbnails-p 2 1))
+         (views-a (string-to-number (replace-regexp-in-string "," "" (aref (cadr a) idx))))
+         (views-b (string-to-number (replace-regexp-in-string "," "" (aref (cadr b) idx)))))
     (< views-a views-b)))
 
 (defun yeetube--duration-to-seconds (duration)
@@ -701,8 +702,9 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
 
 (defun yeetube--sort-duration (a b)
   "Sort entries A and B by duration."
-  (let ((duration-a (yeetube--duration-to-seconds (aref (cadr a) 3)))
-        (duration-b (yeetube--duration-to-seconds (aref (cadr b) 3))))
+  (let* ((idx (if yeetube-display-thumbnails-p 3 2))
+         (duration-a (yeetube--duration-to-seconds (aref (cadr a) idx)))
+         (duration-b (yeetube--duration-to-seconds (aref (cadr b) idx))))
     (< duration-a duration-b)))
 
 (defun yeetube--parse-relative-date (date)
@@ -724,8 +726,9 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
 
 (defun yeetube--sort-date (a b)
   "Sort entries A and B by relative date."
-  (let ((date-a (yeetube--parse-relative-date (aref (cadr a) 4)))
-        (date-b (yeetube--parse-relative-date (aref (cadr b) 4))))
+  (let* ((idx (if yeetube-display-thumbnails-p 4 3))
+         (date-a (yeetube--parse-relative-date (aref (cadr a) idx)))
+         (date-b (yeetube--parse-relative-date (aref (cadr b) idx))))
     (< date-a date-b)))
 
 (defun yeetube--tabulated-list-format (thumbnail-p)
