@@ -679,7 +679,7 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
   "v" #'yeetube-mpv-toggle-video
   "V" #'yeetube-mpv-toggle-no-video-flag
   "s" #'yeetube-save-video
-  "S" #'yeetube-channel-streams
+  "L" #'yeetube-channel-streams
   "P" #'yeetube-play-saved-video
   "r" #'yeetube-replay
   "T" #'yeetube-mpv-toggle-torsocks
@@ -762,6 +762,7 @@ If THUMBNAIL-P is non-nil, display thumbnails."
   :keymap yeetube-mode-map
   (yeetube-tabulated-list)
   (setq-local yeetube-mpv-show-status t)
+  (setq-local truncate-string-ellipsis "")
   (display-line-numbers-mode 0)
   (tabulated-list-init-header)
   (when (and (fboundp 'emojify-mode)
