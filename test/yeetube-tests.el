@@ -241,12 +241,12 @@
 ;;; ---- Group 10: yeetube-mode buffer-local settings ----
 
 (ert-deftest yeetube-test-mode-sets-truncate-string-ellipsis ()
-  "yeetube-mode sets truncate-string-ellipsis to empty string."
+  "yeetube-mode sets truncate-string-ellipsis to a single space."
   (let ((yeetube-content nil)
         (yeetube-display-thumbnails-p nil))
     (with-temp-buffer
       (yeetube-mode)
-      (should (string= "" truncate-string-ellipsis)))))
+      (should (string= " " truncate-string-ellipsis)))))
 
 ;;; ---- Group 11: Thumbnail image persistence on entry vector ----
 
@@ -275,6 +275,35 @@
             ;; The vector's thumbnail slot should now carry a display property
             (should (get-text-property 0 'display (aref vec 0))))
         (kill-buffer display-buf)))))
+
+(ert-deftest yeetube-test-image-callback-displays-image-in-buffer ()
+  "yeetube--image-callback places the image in the display buffer.
+The buffer argument is passed as a string name, matching real usage."
+  (let* ((fake-image (list 'image :type 'png :data "fakedata"))
+         (vec (vector "[[test-id.jpg]]" "Title" "100" "1:00" "1 day ago" "Ch"))
+         (yeetube-content (list (list "test-id" vec)))
+         (yeetube-thumbnail-size '(120 . 90))
+         (entry (list "test-id" "[[test-id.jpg]]" "Title" "100" "1:00" "1 day ago" "Ch"))
+         (buf-name " *yeetube-display-test*"))
+    (let ((display-buf (generate-new-buffer buf-name)))
+      (unwind-protect
+          (progn
+            (with-current-buffer display-buf
+              (insert "[[test-id.jpg]]"))
+            (cl-letf (((symbol-function 'mm-dissect-buffer) (lambda (&rest _) t))
+                      ((symbol-function 'mm-get-image) (lambda (_) fake-image))
+                      ((symbol-function 'image-property)
+                       (lambda (img prop) (plist-get (cdr img) prop)))
+                      ((symbol-function 'set-image-property)
+                       (lambda (img prop val) (plist-put (cdr img) prop val))))
+              ;; Pass buffer as a STRING name, just like the real code does
+              (with-temp-buffer
+                (yeetube--image-callback nil entry buf-name)))
+            ;; The placeholder text in the buffer should now have a display property
+            (with-current-buffer display-buf
+              (should (get-text-property 1 'display (buffer-string)))))
+        (when (buffer-live-p display-buf)
+          (kill-buffer display-buf))))))
 
 (ert-deftest yeetube-test-image-callback-no-crash-on-missing-entry ()
   "yeetube--image-callback does not crash when entry is not in yeetube-content."
