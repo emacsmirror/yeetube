@@ -389,8 +389,11 @@ Image is inserted in BUFFER for ENTRY."
               (progn
                 (setf (image-property image :max-width) (car yeetube-thumbnail-size)
                       (image-property image :max-height) (cdr yeetube-thumbnail-size))
-                ;; Debugging Statement
-                ;; (message "Retrieved and processing image for %s" (plist-get entry :title))
+                (let* ((id (car entry))
+                       (content-entry (assoc id yeetube-content))
+                       (vec (cadr content-entry)))
+                  (when vec
+                    (aset vec 0 (propertize (aref vec 0) 'display image))))
                 (with-current-buffer buffer
                   (with-silent-modifications
                     (save-excursion
