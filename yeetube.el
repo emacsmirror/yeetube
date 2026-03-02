@@ -140,7 +140,7 @@ Valid options include:
   :prefix 'yeetube-face)
 
 (defcustom yeetube-thumbnail-size '(120 . 90)
-  "Thumbnail size (height width)."
+  "Thumbnail size (width . height)."
   :type '(cons integer integer)
   :group 'yeetube)
 
