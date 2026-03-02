@@ -321,12 +321,10 @@ This is a variable watcher function that writes NEW-VALUE to the saved
 videos file whenever `yeetube-saved-videos' changes.  _SYMBOL is the
 variable being watched, _WHERE indicates the type of change, and
 _ENVIRONMENT is the lexical environment."
-  (with-temp-buffer (find-file (concat user-emacs-directory "yeetube"))
-		    (erase-buffer)
-		    (setf yeetube-saved-videos new-value)
-		    (insert (pp-to-string yeetube-saved-videos))
-		    (save-buffer)
-		    (kill-buffer)))
+  (let ((file-path (concat user-emacs-directory "yeetube")))
+    (with-temp-buffer
+      (insert (pp-to-string new-value))
+      (write-region (point-min) (point-max) file-path))))
 
 (defvar yeetube-filter-code-alist
   '(("Relevance" . "EgIQAQ%253D%253D")
