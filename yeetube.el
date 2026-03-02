@@ -760,9 +760,9 @@ If THUMBNAIL-P is non-nil, display thumbnails."
 (define-derived-mode yeetube-mode tabulated-list-mode "Yeetube"
   "Yeetube mode."
   :keymap yeetube-mode-map
+  (setq-local truncate-string-ellipsis " ")
   (yeetube-tabulated-list)
   (setq-local yeetube-mpv-show-status t)
-  (setq-local truncate-string-ellipsis "")
   (display-line-numbers-mode 0)
   (tabulated-list-init-header)
   (when (and (fboundp 'emojify-mode)
