@@ -109,14 +109,16 @@ it to play local files."
 		  (yeetube-mpv-ytdl-format-video-quality yeetube-mpv-video-quality)
 		  " "
 		  (shell-quote-argument input)
-		  " "
-		  (mapconcat #'identity yeetube-mpv-additional-flags " "))))
-    (yeetube-mpv-process yeetube-command)
-    (message "Yeetube command: %s" yeetube-command)
-    (message (if yeetube-mpv-enable-torsocks
-		 "yeetube: Starting mpv process (Using Torsocks)"
-	       "yeetube: Starting mpv process"))
-    (setf yeetube-mpv-currently-playing (format "[%s]" info))))
+		  (if yeetube-mpv-additional-flags
+		      (concat " " (mapconcat #'identity yeetube-mpv-additional-flags " "))
+		    ""))))
+    (let ((proc (yeetube-mpv-process yeetube-command)))
+      (message "Yeetube command: %s" yeetube-command)
+      (message (if yeetube-mpv-enable-torsocks
+		   "yeetube: Starting mpv process (Using Torsocks)"
+		 "yeetube: Starting mpv process"))
+      (setf yeetube-mpv-currently-playing (format "[%s]" info))
+      proc)))
 
 (define-minor-mode yeetube-mpv-modeline-mode
   "Minor mode for showing currently playing information on the modeline.
