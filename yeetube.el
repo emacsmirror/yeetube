@@ -377,31 +377,33 @@ _ENVIRONMENT is the lexical environment."
            (url-retrieve url #'yeetube--callback nil 'silent 'inhibit-cookies))
 	(url-retrieve url #'yeetube--callback nil 'silent 'inhibit-cookies)))))
 
+(defun yeetube--extract-image (status)
+  "Extract thumbnail image from the current URL callback buffer.
+Return the image sized per `yeetube-thumbnail-size', or nil on error."
+  (unless (plist-get status :error)
+    (when-let* ((handle (mm-dissect-buffer t))
+                (image (mm-get-image handle)))
+      (setf (image-property image :max-width) (car yeetube-thumbnail-size)
+            (image-property image :max-height) (cdr yeetube-thumbnail-size))
+      image)))
+
 (defun yeetube--image-callback (status entry buffer)
   "Yeetube callback for thumbnail images handling STATUS.
 Image is inserted in BUFFER for ENTRY."
-  (let ((url-buffer (current-buffer)))
-    (unwind-protect
-        (if-let* ((err (plist-get status :error)))
-            (message "Error %s in retrieving a thumbnail: %S" (car err) (cdr err))
-          (if-let* ((handle (mm-dissect-buffer t))
-                    (image (mm-get-image handle)))
-              (progn
-                (setf (image-property image :max-width) (car yeetube-thumbnail-size)
-                      (image-property image :max-height) (cdr yeetube-thumbnail-size))
-                (let* ((id (car entry))
-                       (content-entry (assoc id yeetube-content))
-                       (vec (cadr content-entry)))
-                  (when vec
-                    (aset vec 0 (propertize (aref vec 0) 'display image))))
-                (with-current-buffer buffer
-                  (with-silent-modifications
-                    (save-excursion
-                      (goto-char (point-min))
-                      (search-forward (format "[[%s.jpg]]" (car entry)))
-                      (add-text-properties (match-beginning 0) (match-end 0)
-                                           `(display ,image)))))))
-	  (kill-buffer url-buffer)))))
+  (let* ((url-buffer (current-buffer))
+         (image (yeetube--extract-image status)))
+    (kill-buffer url-buffer)
+    (when image
+      (when-let* ((vec (cadr (assoc (car entry) yeetube-content))))
+        (aset vec 0 (propertize (aref vec 0) 'display image)))
+      (when (get-buffer buffer)
+        (with-current-buffer buffer
+          (with-silent-modifications
+            (save-excursion
+              (goto-char (point-min))
+              (when (search-forward (format "[[%s.jpg]]" (car entry)) nil t)
+                (add-text-properties (match-beginning 0) (match-end 0)
+                                     `(display ,image))))))))))
 
 (defun yeetube--retrieve-thumbnail (url str buffer)
   "Retrieve thumbnail from URL and show it in place of STR in BUFFER."
