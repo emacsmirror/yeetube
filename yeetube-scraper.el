@@ -33,9 +33,10 @@
          (date (when date-raw (string-replace "Streamed " "" date-raw)))
          (byline-runs (alist-get 'runs (alist-get 'longBylineText renderer)))
          (channel (alist-get 'text (car byline-runs)))
-         (channel-id (alist-get 'canonicalBaseUrl
-                      (alist-get 'browseEndpoint
-                       (alist-get 'navigationEndpoint (car byline-runs)))))
+         (browse-endpoint (alist-get 'browseEndpoint
+                          (alist-get 'navigationEndpoint (car byline-runs))))
+         (channel-id (alist-get 'canonicalBaseUrl browse-endpoint))
+         (browse-id (alist-get 'browseId browse-endpoint))
          (thumbs (alist-get 'thumbnails (alist-get 'thumbnail renderer)))
          (thumb-url (yeetube-scraper--thumbnail-url
                      (alist-get 'videoId renderer) thumbs)))
@@ -46,6 +47,7 @@
           :date (or date "")
           :channel (or channel "")
           :channel-id (or channel-id "")
+          :browse-id (or browse-id "")
           :thumbnail-url (or thumb-url "")
           :type 'video)))
 

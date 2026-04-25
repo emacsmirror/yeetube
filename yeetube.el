@@ -192,6 +192,10 @@ videos from.")
 (defvar-local yeetube--channel-id nil
   "Current channel ID.")
 
+(defconst yeetube-rss-feed-url
+  "https://www.youtube.com/feeds/videos.xml?channel_id="
+  "Base URL for YouTube RSS feeds.")
+
 (defvar yeetube-filter-code-alist
   '(("Relevance" . "EgIQAQ%253D%253D")
     ("Date" . "CAISAhAB")
@@ -274,6 +278,20 @@ videos from.")
   (let ((url (yeetube-get-url)))
     (kill-new url)
     (message "Copied url: %s" url)))
+
+;;;###autoload
+(defun yeetube-copy-rss-feed-url ()
+  "Copy the RSS feed URL for the channel at point."
+  (interactive)
+  (cl-assert (derived-mode-p 'yeetube-mode) nil "Yeetube mode not enabled")
+  (let* ((id (tabulated-list-get-id))
+         (item (yeetube--find-item id))
+         (browse-id (plist-get item :browse-id)))
+    (if (and browse-id (not (string-empty-p browse-id)))
+        (let ((url (concat yeetube-rss-feed-url browse-id)))
+          (kill-new url)
+          (message "Copied RSS feed: %s" url))
+      (message "No channel ID available for this entry"))))
 
 ;;;###autoload
 (defun yeetube-replay ()
@@ -560,24 +578,20 @@ When called from the *yeetube* buffer, re-fetches with the new limit."
 (defvar-keymap yeetube-mode-map
   :doc "Keymap for yeetube commands"
   "RET" #'yeetube-play
-  "M-RET" #'yeetube-search
-  "b" #'yeetube-browse-url
+  "s" #'yeetube-search
+  "M-n" #'yeetube-next-page
   "c" #'yeetube-channel-videos
+  "L" #'yeetube-channel-streams
+  "r" #'yeetube-replay
+  "P" #'yeetube-play-saved-video
+  "S" #'yeetube-save-video
   "C" #'yeetube-copy-url
+  "R" #'yeetube-copy-rss-feed-url
+  "b" #'yeetube-browse-url
   "d" #'yeetube-download-video
-  "D" #'yeetube-download-change-directory
-  "a" #'yeetube-download-change-audio-format
   "p" #'yeetube-mpv-toggle-pause
   "v" #'yeetube-mpv-toggle-video
   "V" #'yeetube-mpv-toggle-no-video-flag
-  "s" #'yeetube-save-video
-  "L" #'yeetube-channel-streams
-  "P" #'yeetube-play-saved-video
-  "r" #'yeetube-replay
-  "T" #'yeetube-mpv-toggle-torsocks
-  "C-q" #'yeetube-mpv-change-video-quality
-  "M-n" #'yeetube-next-page
-  "C-c l" #'yeetube-set-results-limit
   "h" #'yeetube-buffer-menu
   "q" #'quit-window)
 

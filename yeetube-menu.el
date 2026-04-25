@@ -35,6 +35,7 @@
 (declare-function yeetube-download-video "yeetube")
 (declare-function yeetube-save-video "yeetube")
 (declare-function yeetube-copy-url "yeetube")
+(declare-function yeetube-copy-rss-feed-url "yeetube")
 (declare-function yeetube-browse-url "yeetube")
 (declare-function yeetube-channel-videos "yeetube")
 (declare-function yeetube-channel-streams "yeetube")
@@ -157,6 +158,7 @@
    ["Actions"
     ("S" "Save video" yeetube-save-video)
     ("C" "Copy URL" yeetube-copy-url)
+    ("R" "Copy RSS feed URL" yeetube-copy-rss-feed-url)
     ("b" "Browse (invidious)" yeetube-browse-url)
     ("d" "Download" yeetube-download-video)]
    ["MPV"
