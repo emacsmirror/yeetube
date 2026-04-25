@@ -1,0 +1,32 @@
+{
+  "lockupViewModel": {
+    "contentId": "PLlONLmJCfHToFfk1WgTOwZMfIr062jIN9",
+    "contentType": "LOCKUP_CONTENT_TYPE_PLAYLIST",
+    "metadata": {
+      "lockupMetadataViewModel": {
+        "title": {"content": "Emacs From Scratch"},
+        "metadata": {
+          "contentMetadataViewModel": {
+            "metadataRows": [
+              {"metadataParts": [{"text": {"content": "lxsameer"}}]},
+              {"metadataParts": [{"text": {"content": "15 videos"}}]}
+            ]
+          }
+        }
+      }
+    },
+    "contentImage": {
+      "collectionThumbnailViewModel": {
+        "primaryThumbnail": {
+          "thumbnailViewModel": {
+            "image": {
+              "sources": [
+                {"url": "https://i.ytimg.com/vi/xxx/hqdefault.jpg", "width": 336}
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

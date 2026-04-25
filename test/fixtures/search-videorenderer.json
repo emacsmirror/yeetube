@@ -1,0 +1,31 @@
+{
+  "videoRenderer": {
+    "videoId": "48JlgiBpw_I",
+    "title": {
+      "runs": [{"text": "The Absolute Beginner's Guide to Emacs"}],
+      "accessibility": {"accessibilityData": {"label": "Guide to Emacs 1 hour"}}
+    },
+    "viewCountText": {"simpleText": "454,448 views"},
+    "lengthText": {
+      "accessibility": {"accessibilityData": {"label": "1 hour, 11 minutes"}},
+      "simpleText": "1:11:56"
+    },
+    "publishedTimeText": {"simpleText": "5 years ago"},
+    "longBylineText": {
+      "runs": [{
+        "text": "System Crafters",
+        "navigationEndpoint": {
+          "browseEndpoint": {
+            "browseId": "UCAiiOTio8Yu69c3XnR7nQBQ",
+            "canonicalBaseUrl": "/@SystemCrafters"
+          }
+        }
+      }]
+    },
+    "thumbnail": {
+      "thumbnails": [
+        {"url": "https://i.ytimg.com/vi/48JlgiBpw_I/hq720.jpg?sqp=xxx", "width": 360, "height": 202}
+      ]
+    }
+  }
+}
