@@ -197,7 +197,7 @@ videos from.")
     ("Date" . "CAISAhAB")
     ("Views" . "CAMSAhAB")
     ("Rating" . "CAESAhAB"))
-  "Filter codes.")
+  "YouTube's opaque sort filter codes, appended as &sp= parameter.")
 
 (defvar yeetube-request-headers
   '(("Accept-Language" . "en-US,en;q=0.9")
@@ -209,7 +209,7 @@ videos from.")
   "YouTube API client version for continuation requests.")
 
 
-;;; ---- Helpers ----
+;;; Helpers
 
 (defun yeetube--find-item (id)
   "Find item plist with ID in `yeetube-items'."
@@ -249,7 +249,7 @@ videos from.")
   (read-string "Yeetube Search: " nil 'yeetube-search-history))
 
 
-;;; ---- Playback ----
+;;; Playback
 
 ;;;###autoload
 (defun yeetube-play ()
@@ -308,7 +308,7 @@ Select entry title from `yeetube-history' and play corresponding URL."
      (replace-regexp-in-string "youtube.com" invidious-instance (yeetube-get-url)))))
 
 
-;;; ---- Bookmarks ----
+;;; Bookmarks
 
 (defun yeetube-load-saved-videos ()
   "Load saved videos."
@@ -376,7 +376,7 @@ _ENVIRONMENT is the lexical environment."
 (add-variable-watcher 'yeetube-saved-videos #'yeetube-update-saved-videos-list)
 
 
-;;; ---- Download ----
+;;; Download
 
 ;;;###autoload
 (defun yeetube-download-video (&optional url)
@@ -396,7 +396,7 @@ Optionally, provide custom own URL."
         (message "Downloading: '%s' at '%s'" title yeetube-download-directory)))))
 
 
-;;; ---- Search & Callbacks ----
+;;; Search & Callbacks
 
 (defun yeetube--callback (status)
   "Yeetube callback handling STATUS."
@@ -446,6 +446,7 @@ Optionally, provide custom own URL."
     (erase-buffer)
     (insert (propertize "Loading..." 'face 'bold-italic)))
   (yeetube-display-content-from-url
+   ;; ucbcb=1 bypasses EU cookie consent redirect
    (format "https://youtube.com/search?q=%s&ucbcb=1%s"
            (url-hexify-string query)
            (if yeetube-filter
@@ -453,7 +454,7 @@ Optionally, provide custom own URL."
 	     ""))))
 
 
-;;; ---- Pagination ----
+;;; Pagination
 
 (defun yeetube-set-results-limit (limit)
   "Set the results limit for the current buffer to LIMIT.
@@ -527,7 +528,7 @@ When called from the *yeetube* buffer, re-fetches with the new limit."
       (kill-buffer url-buffer))))
 
 
-;;; ---- Channel browsing ----
+;;; Channel browsing
 
 (defun yeetube-channel-videos (&optional channel-id)
   "View videos for the channel with CHANNEL-ID."
@@ -554,7 +555,7 @@ When called from the *yeetube* buffer, re-fetches with the new limit."
            channel-id (url-hexify-string query))))
 
 
-;;; ---- Mode ----
+;;; Mode
 
 (defvar-keymap yeetube-mode-map
   :doc "Keymap for yeetube commands"

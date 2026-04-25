@@ -38,7 +38,7 @@
 (declare-function yeetube-with-tor-socks "yeetube")
 
 
-;;; ---- Faces ----
+;;; Faces
 
 (defgroup yeetube-faces nil
   "Faces used by yeetube."
@@ -77,7 +77,7 @@
   :group 'yeetube-faces)
 
 
-;;; ---- View count formatting ----
+;;; View count formatting
 
 (defun yeetube-ui--format-views (views-string)
   "Format VIEWS-STRING by extracting digits and adding commas."
@@ -94,7 +94,7 @@
          ",")))))
 
 
-;;; ---- Column index helper ----
+;;; Column index helper
 
 (defun yeetube-ui--column-index (name)
   "Return the vector index for column NAME.
@@ -110,7 +110,7 @@ Accounts for the thumbnail column offset when thumbnails are enabled."
     (+ base offset)))
 
 
-;;; ---- Plist-to-vector conversion ----
+;;; Plist-to-vector conversion
 
 (defun yeetube-ui--entry-to-row (entry)
   "Convert plist ENTRY to a tabulated-list row (ID VECTOR).
@@ -142,7 +142,7 @@ The vector layout depends on `yeetube-display-thumbnails-p'."
               (apply #'vector fields)))))
 
 
-;;; ---- Sort helpers ----
+;;; Sort helpers
 
 (defun yeetube-ui--duration-to-seconds (duration)
   "Convert DURATION string in HH:MM:SS format to total seconds."
@@ -195,7 +195,7 @@ The vector layout depends on `yeetube-display-thumbnails-p'."
     (< date-a date-b)))
 
 
-;;; ---- Tabulated-list setup ----
+;;; Tabulated-list setup
 
 (defun yeetube-ui--tabulated-list-format ()
   "Return the `tabulated-list-format' vector."
@@ -232,7 +232,7 @@ The vector layout depends on `yeetube-display-thumbnails-p'."
     (tabulated-list-print t)))
 
 
-;;; ---- Thumbnail fetching ----
+;;; Thumbnail fetching
 
 (defun yeetube-ui--extract-image (status)
   "Extract thumbnail image from the current URL callback buffer.

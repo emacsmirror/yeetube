@@ -15,7 +15,7 @@
   (add-to-list 'load-path (expand-file-name ".." dir)))
 (require 'yeetube)
 
-;;; ---- Group 1: yeetube-ui--format-views ----
+;;; Group 1: yeetube-ui--format-views
 
 (ert-deftest yeetube-ui-test-format-views-empty ()
   "Empty string returns empty."
@@ -41,7 +41,7 @@
   "Non-digit characters are stripped before formatting."
   (should (string= "1,234" (yeetube-ui--format-views "1,234 views"))))
 
-;;; ---- Group 2: yeetube-ui--duration-to-seconds ----
+;;; Group 2: yeetube-ui--duration-to-seconds
 
 (ert-deftest yeetube-ui-test-duration-to-seconds-hhmmss ()
   "HH:MM:SS format converts correctly."
@@ -63,7 +63,7 @@
   "Large duration converts correctly."
   (should (= 36610 (yeetube-ui--duration-to-seconds "10:10:10"))))
 
-;;; ---- Group 3: yeetube-ui--parse-relative-date ----
+;;; Group 3: yeetube-ui--parse-relative-date
 
 (ert-deftest yeetube-ui-test-parse-relative-date-seconds ()
   "Seconds parsed correctly."
@@ -97,7 +97,7 @@
   "Unknown unit returns 0."
   (should (= 0 (yeetube-ui--parse-relative-date "5 fortnights ago"))))
 
-;;; ---- Group 4: yeetube-ui--entry-to-row ----
+;;; Group 4: yeetube-ui--entry-to-row
 
 (ert-deftest yeetube-ui-test-entry-to-row-video-no-thumbnails ()
   "Plist converts to row without thumbnail column."
@@ -140,7 +140,7 @@
          (vec (cadr row)))
     (should (string-match-p "Playlist: My List" (aref vec 0)))))
 
-;;; ---- Group 5: Sort functions ----
+;;; Group 5: Sort functions
 
 (ert-deftest yeetube-ui-test-sort-views-with-thumbnails ()
   "Sort by views works when thumbnails are enabled (index 2)."
@@ -190,7 +190,7 @@
     (should (yeetube-ui--sort-date a b))
     (should-not (yeetube-ui--sort-date b a))))
 
-;;; ---- Group 6: Thumbnail image callback ----
+;;; Group 6: Thumbnail image callback
 
 (ert-deftest yeetube-ui-test-image-callback-persists-image-on-vector ()
   "yeetube-ui--image-callback stores the image display property on the content vector."

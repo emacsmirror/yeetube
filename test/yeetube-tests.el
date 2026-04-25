@@ -19,7 +19,7 @@
   (add-to-list 'load-path (expand-file-name ".." dir)))
 (require 'yeetube)
 
-;;; ---- Group 1: yeetube-get-filter-code ----
+;;; Group 1: yeetube-get-filter-code
 
 (ert-deftest yeetube-test-get-filter-code-relevance ()
   "Relevance filter returns correct code."
@@ -41,7 +41,7 @@
   "Unknown filter returns nil."
   (should-not (yeetube-get-filter-code "Nonexistent")))
 
-;;; ---- Group 2: yeetube--callback error detection (regression) ----
+;;; Group 2: yeetube--callback error detection (regression)
 
 (ert-deftest yeetube-test-callback-plist-get-arg-order ()
   "Verify plist-get extracts :error from a status plist correctly."
@@ -52,7 +52,7 @@
   (let ((status '(:peer (:certificate ...))))
     (should-not (plist-get status :error))))
 
-;;; ---- Group 3: yeetube--find-item ----
+;;; Group 3: yeetube--find-item
 
 (ert-deftest yeetube-test-find-item ()
   "Find item plist by ID."
@@ -62,7 +62,7 @@
     (should (equal "Second" (plist-get (yeetube--find-item "def") :title)))
     (should-not (yeetube--find-item "nonexistent"))))
 
-;;; ---- Group 4: yeetube-get-url ----
+;;; Group 4: yeetube-get-url
 
 (ert-deftest yeetube-test-get-url-video ()
   "Get URL for a video."
@@ -77,7 +77,7 @@
     (should (equal "https://youtube.com/playlist?list=PLxyz"
                    (yeetube-get-url "PLxyz" 'playlist)))))
 
-;;; ---- Group 5: yeetube-mpv-play returns a process (regression) ----
+;;; Group 5: yeetube-mpv-play returns a process (regression)
 
 (ert-deftest yeetube-test-mpv-play-returns-process ()
   "Verify yeetube-mpv-play returns the process object."
@@ -95,7 +95,7 @@
       (when (process-live-p proc)
         (delete-process proc)))))
 
-;;; ---- Group 6: yeetube-update-saved-videos-list round-trip (regression) ----
+;;; Group 6: yeetube-update-saved-videos-list round-trip (regression)
 
 (ert-deftest yeetube-test-update-saved-videos-round-trip ()
   "Saved videos can be written and read back."
@@ -118,7 +118,7 @@
           (delete-directory temp-dir t)))
     (add-variable-watcher 'yeetube-saved-videos #'yeetube-update-saved-videos-list)))
 
-;;; ---- Group 7: yeetube-mode-map keybindings ----
+;;; Group 7: yeetube-mode-map keybindings
 
 (ert-deftest yeetube-test-keymap-S-not-bound ()
   "S key is not bound in yeetube-mode-map, leaving tabulated-list-sort accessible."
@@ -136,7 +136,7 @@
   "M-n is bound to yeetube-next-page."
   (should (eq 'yeetube-next-page (lookup-key yeetube-mode-map (kbd "M-n")))))
 
-;;; ---- Group 8: yeetube-mode buffer-local settings ----
+;;; Group 8: yeetube-mode buffer-local settings
 
 (ert-deftest yeetube-test-mode-sets-truncate-string-ellipsis ()
   "yeetube-mode sets truncate-string-ellipsis to a single space."

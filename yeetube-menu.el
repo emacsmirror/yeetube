@@ -60,7 +60,7 @@
 (defvar yeetube-mpv-enable-torsocks)
 
 
-;;; ---- Setting suffixes ----
+;;; Setting suffixes
 
 (defun yeetube-menu--value-str (value)
   "Format VALUE as a propertized string for transient display."
@@ -122,7 +122,7 @@
                     nil t)))
 
 
-;;; ---- Transient prefixes ----
+;;; Transient prefixes
 
 ;;;###autoload
 (transient-define-prefix yeetube-menu ()

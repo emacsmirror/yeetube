@@ -55,10 +55,11 @@ Falls back to the predictable default.jpg URL pattern."
   (or (when-let* ((url (alist-get 'url (car thumbnails)))
                   (qmark (string-search "?" url))
                   (base (substring url 0 qmark)))
+        ;; Use the smaller "default" variant instead of hq720
         (string-replace "hq720" "default" base))
       (format "https://i.ytimg.com/vi/%s/default.jpg" video-id)))
 
-;;; ---- Playlist extraction (lockupViewModel) ----
+;;; Playlist extraction (lockupViewModel)
 
 (defun yeetube-scraper--row-text (row)
   "Extract the content string from a metadata ROW."
@@ -109,18 +110,19 @@ Falls back to the predictable default.jpg URL pattern."
           :thumbnail-url (or thumb-url "")
           :type 'playlist)))
 
-;;; ---- Item dispatch ----
+;;; Item dispatch
 
 (defun yeetube-scraper--dispatch-item (item)
   "Dispatch ITEM to the appropriate extractor.  Return plist or nil."
   (cond
    ((alist-get 'videoRenderer item)
     (yeetube-scraper--extract-video (alist-get 'videoRenderer item)))
+   ;; YouTube migrated playlists from playlistRenderer to lockupViewModel
    ((when-let* ((lockup (alist-get 'lockupViewModel item)))
       (equal (alist-get 'contentType lockup) "LOCKUP_CONTENT_TYPE_PLAYLIST"))
     (yeetube-scraper--extract-playlist (alist-get 'lockupViewModel item)))))
 
-;;; ---- Continuation token extraction ----
+;;; Continuation token extraction
 
 (defun yeetube-scraper--extract-continuation (sections)
   "Extract continuation token from SECTIONS.
@@ -140,7 +142,7 @@ Return plist (:token T :url U) or nil."
         (when token
           (list :token token :url (or url "")))))))
 
-;;; ---- Section / grid item extraction ----
+;;; Section / grid item extraction
 
 (defun yeetube-scraper--extract-section-items (sections)
   "Extract item plists from search result SECTIONS."
@@ -163,7 +165,7 @@ Return plist (:token T :url U) or nil."
            when renderer
            collect (yeetube-scraper--extract-video renderer)))
 
-;;; ---- Page-type parsers ----
+;;; Page-type parsers
 
 (defun yeetube-scraper--parse-search (contents)
   "Parse search results from CONTENTS alist.
@@ -195,7 +197,7 @@ Return plist (:items ITEMS :continuation CONT)."
          (continuation (yeetube-scraper--extract-continuation grid-contents)))
     (list :items items :continuation continuation)))
 
-;;; ---- Top-level buffer parser ----
+;;; Top-level buffer parser
 
 (defun yeetube-scraper-parse ()
   "Parse ytInitialData from the current buffer.
@@ -215,7 +217,7 @@ Point is restored after parsing."
         (yeetube-scraper--parse-channel contents))
        (t (list :items nil :continuation nil))))))
 
-;;; ---- Continuation response parser ----
+;;; Continuation response parser
 
 (defun yeetube-scraper-parse-continuation-response (json)
   "Parse a continuation/pagination JSON response.

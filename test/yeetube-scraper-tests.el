@@ -25,7 +25,7 @@
       (insert-file-contents path)
       (json-parse-buffer :object-type 'alist :array-type 'list))))
 
-;;; ---- Group 1: videoRenderer extraction ----
+;;; Group 1: videoRenderer extraction
 
 (ert-deftest yeetube-scraper-test-extract-video-renderer ()
   "Extract plist from a videoRenderer alist."
@@ -75,7 +75,7 @@
          (result (yeetube-scraper--extract-video renderer)))
     (should (equal "2 days ago" (plist-get result :date)))))
 
-;;; ---- Group 2: lockupViewModel playlist extraction ----
+;;; Group 2: lockupViewModel playlist extraction
 
 (ert-deftest yeetube-scraper-test-extract-playlist ()
   "Extract plist from a lockupViewModel playlist."
@@ -113,7 +113,7 @@
     (should (equal "ChannelName"
                    (yeetube-scraper--playlist-channel rows)))))
 
-;;; ---- Group 3: dispatch-item ----
+;;; Group 3: dispatch-item
 
 (ert-deftest yeetube-scraper-test-dispatch-video ()
   "Dispatch routes videoRenderer to extract-video."
@@ -152,7 +152,7 @@
   (let ((item '((adSlot (something . "ad data")))))
     (should-not (yeetube-scraper--dispatch-item item))))
 
-;;; ---- Group 4: continuation token extraction ----
+;;; Group 4: continuation token extraction
 
 (ert-deftest yeetube-scraper-test-extract-continuation ()
   "Extract continuation token and URL from sections."
@@ -173,7 +173,7 @@
   (let ((sections '(((itemSectionRenderer (contents))))))
     (should-not (yeetube-scraper--extract-continuation sections))))
 
-;;; ---- Group 5: full buffer parsing ----
+;;; Group 5: full buffer parsing
 
 (defun yeetube-scraper-test--make-video-renderer (id title)
   "Build a minimal videoRenderer alist with ID and TITLE.
