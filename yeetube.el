@@ -585,19 +585,16 @@ Optionally, provide custom own URL."
   (read-directory-name prompt))
 
 (define-described-keymap yeetube-mode-map
-  "Yeetube"
-
+  "Yeetube Mode Map"
   :group "Play"
   "RET" ("Play" yeetube-play)
   "r"   ("Replay" yeetube-replay)
   "P"   ("Play saved" yeetube-play-saved-video)
-
   :group "Navigate"
   "s"   ("Search" yeetube-search)
   "M-n" ("Next page" yeetube-next-page)
   "c"   ("Channel videos" yeetube-channel-videos)
   "L"   ("Channel streams" yeetube-channel-streams)
-
   :group "Actions"
   "S"   ("Save video" yeetube-save-video)
   "C"   ("Copy URL" yeetube-copy-url)
@@ -605,7 +602,6 @@ Optionally, provide custom own URL."
   "b"   ("Browse (invidious)" yeetube-browse-url)
   "d"   ("Download" yeetube-download-video)
   "o"   ("Settings" :switch yeetube--show-settings)
-
   :group "Settings"
   "p"   ("Toggle pause" yeetube-mpv-toggle-pause :if (lambda () yeetube--show-settings))
   "v"   ("Toggle video" yeetube-mpv-toggle-video :if (lambda () yeetube--show-settings))
