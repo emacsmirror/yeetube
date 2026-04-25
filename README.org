@@ -1,0 +1,144 @@
+
+GNU Emacs YouTube front-end.
+
+#+hugo: more
+
+- [[https://git.thanosapollo.org/yeetube/][Git Repository]]
+- [[https://codeberg.org/ThanosApollo/emacs-yeetube][Codeberg Mirror]]
+
+
+** About
+:PROPERTIES:
+:CUSTOM_ID: about
+:END:
+
+#+begin_quote
+/Yee(t) (You)Tube/
+#+end_quote
+
+This package provides the ability to scrape YouTube, with the results
+displayed in a tabulated list.
+
+Core features include:
+
+- Executing queries on YouTube
+- Playing & Downloading video(s)
+- Pagination for loading more results
+- Transient menus for quick access to all commands
+- A standalone, minimalist yt-dlp wrapper
+
+/This package does not use Invidious or YouTube's API, just parses
+html & json./
+
+** Installation
+:PROPERTIES:
+:CUSTOM_ID: installation
+:END:
+/YeeTube is available via [[https://melpa.org/#/yeetube][MELPA]]/
+
+Example using =use-package=
+
+#+begin_src emacs-lisp
+(use-package yeetube
+  :ensure t
+  :bind ("C-c y" . #'yeetube))
+#+end_src
+
+*** Dependencies
+:PROPERTIES:
+:CUSTOM_ID: dependencies
+:END:
+- [[https://mpv.io/][mpv]]
+- [[https://github.com/yt-dlp/yt-dlp][yt-dlp]]
+
+/Debian/Ubuntu/
+
+#+begin_src shell
+$ sudo apt install mpv yt-dlp
+#+end_src
+
+** Usage
+:PROPERTIES:
+:CUSTOM_ID: usage
+:END:
+
+- =M-x yeetube= opens the transient menu with search, download and settings
+- =M-x yeetube-search= to search directly
+- In the results buffer, press =h= to see all available keybindings
+
+** Configuration
+:PROPERTIES:
+:CUSTOM_ID: configuration
+:END:
+*** Media Player
+:PROPERTIES:
+:CUSTOM_ID: media-player
+:END:
+By default =yeetube-play-function= is set to =yeetube-mpv-play=, you can
+use [[https://github.com/kljohann/mpv.el][mpv.el]],
+[[https://www.gnu.org/software/emms/][GNU/Emms]] or other similar
+packages like so:
+
+#+begin_src emacs-lisp
+(setf yeetube-play-function #'emms-play-url)
+#+end_src
+
+Make sure that the media player of your choice can directly play
+youtube urls.
+
+*** Thumbnails
+:PROPERTIES:
+:CUSTOM_ID: thumbnails
+:END:
+Disable thumbnails:
+
+#+begin_src emacs-lisp
+(setf yeetube-display-thumbnails-p nil)
+#+end_src
+
+*** Apply Filters
+:PROPERTIES:
+:CUSTOM_ID: apply-filters
+:END:
+To filter the search results based on a specific criterion, you can
+modify the =yeetube-filter= value to your preferred option.
+
+For example:
+
+#+begin_src emacs-lisp
+(setf yeetube-filter "Views")
+#+end_src
+
+This will filter & sort the search results according to the number of views.
+
+*** Results Limit
+:PROPERTIES:
+:CUSTOM_ID: results-limit
+:END:
+By default, yeetube fetches 20 results per search.  You can change this:
+
+#+begin_src emacs-lisp
+(setf yeetube-results-limit 50)
+#+end_src
+
+You can also change it per-buffer via the transient menu (=h= then =n=).
+When the limit exceeds results on one page, additional pages are
+fetched automatically.
+
+*** Tor & torsocks support
+:PROPERTIES:
+:CUSTOM_ID: tor-torsocks-support
+:END:
+For enhanced privacy, using tor & torsocks:
+
+#+begin_src emacs-lisp
+(setf yeetube-enable-tor t
+      yeetube-mpv-enable-torsocks t) ;; if you are using yeetube-mpv as your media player
+#+end_src
+
+It's recommended to disable thumbnail support to improve performance
+when using tor.
+
+Yeetube is configured to use tor via port 9050.
+
+/You can toggle that option for mpv with =yeetube-mpv-toggle-torsocks=/
