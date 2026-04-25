@@ -1,7 +1,0 @@
-#+title: TODO's for Yeetube
-#+author: Thanos Apollo
-
-
-* Features
-** TODO Add yeetube-copy-channel-rss
-+ Copy channel rss feed
