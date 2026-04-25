@@ -82,14 +82,14 @@ Accepted values include: 1080, 720, 480, 360, 240, 144")
 (defun yeetube-mpv-process (command)
   "Start yeetube process for shell COMMAND."
   (yeetube-mpv-check)
-  (let ((yeetube-mpv-process "yeetube"))
+  (let ((proc-name "yeetube"))
     (dolist (process (process-list))
-      (when (string-match yeetube-mpv-process (process-name process))
+      (when (string-match proc-name (process-name process))
 	(kill-process process)))
     (sit-for 0.1)
-    (unless (get-process yeetube-mpv-process)
+    (unless (get-process proc-name)
       (start-process-shell-command
-       "yeetube" "*yeetube-output*" command))))
+       proc-name "*yeetube-output*" command))))
 
 (defun yeetube-mpv-ytdl-format-video-quality (resolution)
   "Return shell quoted argument for ytdlp with RESOLUTION."

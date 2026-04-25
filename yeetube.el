@@ -7,7 +7,7 @@
 ;; URL: https://thanosapollo.org/projects/yeetube/
 ;; Version: 2.1.12
 
-;; Package-Requires: ((emacs "27.2") (compat "29.1.4.2"))
+;; Package-Requires: ((emacs "27.2") (compat "29.1.4.2") (transient "0.7.2"))
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -38,16 +38,18 @@
 ;;; Code:
 
 (require 'compat)
-(require 'image)
 (require 'url)
-(require 'tabulated-list)
 (require 'cl-lib)
 (require 'socks)
 (require 'url-handlers)
-(require 'mm-decode)
 (require 'xdg)
+(require 'json)
 
+(require 'yeetube-scraper)
+(require 'yeetube-ui)
 (require 'yeetube-mpv)
+(require 'yeetube-download)
+(require 'yeetube-menu)
 
 (defgroup yeetube nil
   "Youtube Front-End."
@@ -102,7 +104,8 @@ Valid options include:
   :type '(radio (const "Relevance")
 		(const "Date")
 		(const "Views")
-		(const "Rating")))
+		(const "Rating"))
+  :group 'yeetube)
 
 (defcustom yeetube-default-sort-column nil
   "Column to sort the search results table."
@@ -133,12 +136,6 @@ Valid options include:
   :type 'boolean
   :group 'yeetube)
 
-(defgroup yeetube-faces nil
-  "Faces used by yeetube."
-  :group 'yeetube
-  :tag "Yeetube Faces"
-  :prefix 'yeetube-face)
-
 (defcustom yeetube-thumbnail-size '(120 . 90)
   "Thumbnail size (width . height)."
   :type '(cons integer integer)
@@ -149,42 +146,25 @@ Valid options include:
   :type 'boolean
   :group 'yeetube)
 
-(defface yeetube-face-header-query
-  '((t :inherit font-lock-function-name-face))
-  "Face used for the video published date."
-  :group 'yeetube-faces)
-
-(defface yeetube-face-duration
-  '((t :inherit font-lock-string-face))
-  "Face used for the video duration."
-  :group 'yeetube-faces)
-
-(defface yeetube-face-view-count
-  '((t :inherit font-lock-keyword-face))
-  "Face used for the video view count."
-  :group 'yeetube-faces)
-
-(defface yeetube-face-title
-  '((t :inherit font-lock-variable-use-face))
-  "Face used for video title."
-  :group 'yeetube-faces)
-
-(defface yeetube-face-channel
-  '((t :inherit font-lock-function-call-face))
-  "Face used for video channel name."
-  :group 'yeetube-faces)
-
-(defface yeetube-face-date
-  '((t :inherit font-lock-doc-face))
-  "Face used for published date."
-  :group 'yeetube-faces)
-
 (defvar yeetube-invidious-instances
   '("vid.puffyan.us" "inv.nadeko.net" "invidious.flokinet.to")
   "List of invidious instances.")
 
 (defvar yeetube-content nil
-  "Scraped content.")
+  "Tabulated-list rows (ID VECTOR) pairs.")
+
+(defvar yeetube-items nil
+  "List of scraped item plists.")
+
+(defvar-local yeetube--continuation nil
+  "Continuation plist for pagination.")
+
+(defvar-local yeetube--results-limit nil
+  "Buffer-local results limit.")
+
+(defvar-local yeetube--current-url nil
+  "URL that produced the current results.
+Used to re-fetch when the results limit changes.")
 
 (defvar yeetube-saved-videos nil
   "Saved/bookmarked video urls.")
@@ -209,34 +189,82 @@ You can change this value to an invidious instance.  Although yeetube
 will still query youtube, `yeetube-play' will use the above url to play
 videos from.")
 
-(defvar yeetube--channel-id nil
-  "Value of channel which `yeetube-channel-videos' used for.")
+(defvar-local yeetube--channel-id nil
+  "Current channel ID.")
+
+(defvar yeetube-filter-code-alist
+  '(("Relevance" . "EgIQAQ%253D%253D")
+    ("Date" . "CAISAhAB")
+    ("Views" . "CAMSAhAB")
+    ("Rating" . "CAESAhAB"))
+  "Filter codes.")
+
+(defvar yeetube-request-headers
+  '(("Accept-Language" . "en-US,en;q=0.9")
+    ("Accept" . "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8")
+    ("User-Agent" . "Mozilla/5.0 (Windows NT 10.0; rv:126.0) Gecko/20100101 Firefox/126.0"))
+  "HTTP Request extra headers.")
+
+(defvar yeetube--client-version "2.20260414.01.00"
+  "YouTube API client version for continuation requests.")
+
+
+;;; ---- Helpers ----
+
+(defun yeetube--find-item (id)
+  "Find item plist with ID in `yeetube-items'."
+  (cl-find id yeetube-items
+           :key (lambda (item) (plist-get item :id))
+           :test #'equal))
+
+(defun yeetube-get-filter-code (filter)
+  "Get FILTER code for sorting search results."
+  (cdr (assoc filter yeetube-filter-code-alist)))
+
+(defmacro yeetube-with-tor-socks (&rest body)
+  "Execute BODY with torsocks."
+  `(let ((url-gateway-method 'socks)
+         (socks-noproxy '("localhost"))
+         (socks-server '("Default server" "127.0.0.1" 9050 5)))
+     ,@body))
 
 (defun yeetube-get-url (&optional id type)
   "Get video or playlist url for entry ID, adjusted for TYPE."
-  ;; When point is on thumbnail, id will be nil.
   (let* ((id (or id (tabulated-list-get-id)))
-	 (entry (cadr (assoc id yeetube-content)))
-	 (type (or type (aref entry (- (length entry) 1)))))
+         (item (yeetube--find-item id))
+         (type (or type (plist-get item :type))))
     (format "%s%s" (if (eq type 'video)
-		       yeetube-video-url
-		     yeetube-playlist-url)
-	    id)))
+                       yeetube-video-url
+                     yeetube-playlist-url)
+            id)))
+
+(defun yeetube-channel-id-at-point ()
+  "Return yeetube channel id at point."
+  (let* ((id (tabulated-list-get-id))
+         (item (yeetube--find-item id)))
+    (plist-get item :channel-id)))
+
+(defun yeetube-read-query ()
+  "Interactively read a search term."
+  (read-string "Yeetube Search: " nil 'yeetube-search-history))
+
+
+;;; ---- Playback ----
 
 ;;;###autoload
 (defun yeetube-play ()
   "Play video at point in *yeetube* buffer."
   (interactive)
   (let* ((id (tabulated-list-get-id))
-	 (entry-content (cadr (assoc id yeetube-content)))
-	 (video-url (yeetube-get-url id))
-	 (video-title (aref entry-content (if yeetube-display-thumbnails-p 1 0)))
-	 (proc (apply yeetube-play-function video-url
-		      (when yeetube-mpv-modeline-mode (list video-title)))))
+         (item (yeetube--find-item id))
+         (url (yeetube-get-url id (plist-get item :type)))
+         (title (plist-get item :title))
+         (proc (apply yeetube-play-function url
+                      (when yeetube-mpv-modeline-mode (list title)))))
     (when (processp proc)
-      (process-put proc :now-playing video-title))
-    (push (list :url video-url :title video-title) yeetube-history)
-    (message "Playing: %s" video-title)))
+      (process-put proc :now-playing title))
+    (push (list :url url :title title) yeetube-history)
+    (message "Playing: %s" title)))
 
 ;;;###autoload
 (defun yeetube-copy-url ()
@@ -253,15 +281,34 @@ videos from.")
 
 Select entry title from `yeetube-history' and play corresponding URL."
   (interactive)
-  (let* ((titles (mapcar (lambda (entry) (cl-getf entry :title)) yeetube-history))
+  (let* ((titles (mapcar (lambda (entry) (plist-get entry :title)) yeetube-history))
          (selected (completing-read "Replay: " titles))
          (selected-entry (cl-find-if (lambda (entry)
-				       (string= selected (cl-getf entry :title)))
+				       (string= selected (plist-get entry :title)))
 				     yeetube-history))
-	 (title (cl-getf selected-entry :title))
-         (url (cl-getf selected-entry :url)))
+	 (title (plist-get selected-entry :title))
+         (url (plist-get selected-entry :url)))
     (funcall yeetube-play-function url (when yeetube-mpv-modeline-mode title))
     (message "Replaying: %s" selected)))
+
+;;;###autoload
+(defun yeetube-browse-url ()
+  "Open URL for video at point, using an invidious instance."
+  (interactive)
+  (let ((invidious-instance (cond ((and (listp yeetube-invidious-instances)
+					(length> yeetube-invidious-instances 1))
+				   (nth (random (length yeetube-invidious-instances))
+					yeetube-invidious-instances))
+				  ((and (listp yeetube-invidious-instances)
+					(length= yeetube-invidious-instances 1))
+				   (car yeetube-invidious-instances))
+				  ((stringp yeetube-invidious-instances)
+				   yeetube-invidious-instances))))
+    (browse-url
+     (replace-regexp-in-string "youtube.com" invidious-instance (yeetube-get-url)))))
+
+
+;;; ---- Bookmarks ----
 
 (defun yeetube-load-saved-videos ()
   "Load saved videos."
@@ -326,99 +373,69 @@ _ENVIRONMENT is the lexical environment."
       (insert (pp-to-string new-value))
       (write-region (point-min) (point-max) file-path))))
 
-(defvar yeetube-filter-code-alist
-  '(("Relevance" . "EgIQAQ%253D%253D")
-    ("Date" . "CAISAhAB")
-    ("Views" . "CAMSAhAB")
-    ("Rating" . "CAESAhAB"))
-  "Filter codes.")
+(add-variable-watcher 'yeetube-saved-videos #'yeetube-update-saved-videos-list)
 
-(defvar yeetube-request-headers
-  '(("Accept-Language" . "Accept-Language: en-US,en;q=0.9")
-    ("Accept" . "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8")
-    ("User-Agent" . "Mozilla/5.0 (Windows NT 10.0; rv:126.0) Gecko/20100101 Firefox/126.0"))
-  "HTTP Request extra headers.")
 
-(defun yeetube-get-filter-code (filter)
-  "Get FILTER code for sorting search results."
-  (cdr (assoc filter yeetube-filter-code-alist)))
+;;; ---- Download ----
 
-(defmacro yeetube-with-tor-socks (&rest body)
-  "Execute BODY with torsocks."
-  `(let ((url-gateway-method 'socks)
-         (socks-noproxy '("localhost"))
-         (socks-server '("Default server" "127.0.0.1" 9050 5)))
-     ,@body))
+;;;###autoload
+(defun yeetube-download-video (&optional url)
+  "Download entry at point in *yeetube* buffer with yt-dlp.
+
+Content will be downloaded at `yeetube-download-directory'.
+Optionally, provide custom own URL."
+  (interactive)
+  (let* ((id (tabulated-list-get-id))
+         (item (yeetube--find-item id))
+         (type (plist-get item :type))
+         (url (or url (yeetube-get-url id type)))
+         (title (or (plist-get item :title) "Unknown")))
+    (when (string-prefix-p "http" url)
+      (let ((default-directory yeetube-download-directory))
+        (yeetube-download--ytdlp url nil yeetube-download-audio-format)
+        (message "Downloading: '%s' at '%s'" title yeetube-download-directory)))))
+
+
+;;; ---- Search & Callbacks ----
 
 (defun yeetube--callback (status)
   "Yeetube callback handling STATUS."
   (let ((url-buffer (current-buffer))
-	(pop-to-buffer-func (if yeetube-pop-to-same-window-p
-				#'pop-to-buffer-same-window
-			      #'pop-to-buffer)))
+        (pop-fn (if yeetube-pop-to-same-window-p
+                    #'pop-to-buffer-same-window
+                  #'pop-to-buffer)))
     (unwind-protect
-        (if-let* ((err (plist-get status :error)))
-            (message "Error %s in retrieving yeetube results: %S" (car err) (cdr err))
-          (with-temp-buffer
-            (set-buffer-multibyte t)
-            (url-insert url-buffer)
-            (decode-coding-region (point-min) (point-max) 'utf-8)
-            (yeetube-get-content))
-          (funcall pop-to-buffer-func "*yeetube*")
-          (yeetube-mode))
+        (unless (plist-get status :error)
+          (let* ((limit (with-current-buffer (get-buffer-create "*yeetube*")
+                          (or yeetube--results-limit yeetube-results-limit)))
+                 (result (with-temp-buffer
+                           (set-buffer-multibyte t)
+                           (url-insert url-buffer)
+                           (decode-coding-region (point-min) (point-max) 'utf-8)
+                           (yeetube-scraper-parse)))
+                 (items (plist-get result :items))
+                 (continuation (plist-get result :continuation)))
+            (when items
+              (funcall pop-fn "*yeetube*")
+              (yeetube-mode)
+              (setq yeetube-items items)
+              (setq-local yeetube--continuation continuation)
+              (setq-local yeetube--results-limit limit)
+              (yeetube-ui-render items)
+              (yeetube-ui-fetch-thumbnails items "*yeetube*")
+              (when (and continuation (< (length items) limit))
+                (yeetube--auto-paginate limit)))))
       (kill-buffer url-buffer))))
 
 (defun yeetube-display-content-from-url (url)
   "Display the video results from URL."
-  (with-current-buffer "*yeetube*"
+  (with-current-buffer (get-buffer-create "*yeetube*")
+    (setq-local yeetube--current-url url)
     (let ((url-request-extra-headers yeetube-request-headers))
       (if yeetube-enable-tor
           (yeetube-with-tor-socks
            (url-retrieve url #'yeetube--callback nil 'silent 'inhibit-cookies))
 	(url-retrieve url #'yeetube--callback nil 'silent 'inhibit-cookies)))))
-
-(defun yeetube--extract-image (status)
-  "Extract thumbnail image from the current URL callback buffer.
-Return the image sized per `yeetube-thumbnail-size', or nil on error."
-  (unless (plist-get status :error)
-    (when-let* ((handle (mm-dissect-buffer t))
-                (image (mm-get-image handle)))
-      (setf (image-property image :max-width) (car yeetube-thumbnail-size)
-            (image-property image :max-height) (cdr yeetube-thumbnail-size))
-      image)))
-
-(defun yeetube--image-callback (status entry buffer)
-  "Yeetube callback for thumbnail images handling STATUS.
-Image is inserted in BUFFER for ENTRY."
-  (let* ((url-buffer (current-buffer))
-         (image (yeetube--extract-image status)))
-    (kill-buffer url-buffer)
-    (when image
-      (when-let* ((vec (cadr (assoc (car entry) yeetube-content))))
-        (aset vec 0 (propertize (aref vec 0) 'display image)))
-      (when (get-buffer buffer)
-        (with-current-buffer buffer
-          (with-silent-modifications
-            (save-excursion
-              (goto-char (point-min))
-              (when (search-forward (format "[[%s.jpg]]" (car entry)) nil t)
-                (add-text-properties (match-beginning 0) (match-end 0)
-                                     `(display ,image))))))))))
-
-(defun yeetube--retrieve-thumbnail (url str buffer)
-  "Retrieve thumbnail from URL and show it in place of STR in BUFFER."
-  (let ((url-request-extra-headers yeetube-request-headers))
-    (when yeetube-display-thumbnails-p
-      (if yeetube-enable-tor
-          (yeetube-with-tor-socks
-           (url-queue-retrieve url #'yeetube--image-callback `(,str ,buffer)
-                               'silent 'inhibit-cookies))
-	(url-queue-retrieve url #'yeetube--image-callback `(,str ,buffer)
-                            'silent 'inhibit-cookies)))))
-
-(defun yeetube-read-query ()
-  "Interactively read a search term."
-  (read-string "Yeetube Search: " nil 'yeetube-search-history))
 
 ;;;###autoload
 (defun yeetube-search (query)
@@ -429,248 +446,120 @@ Image is inserted in BUFFER for ENTRY."
     (erase-buffer)
     (insert (propertize "Loading..." 'face 'bold-italic)))
   (yeetube-display-content-from-url
-   (format "https://youtube.com/search?q=%s%s"
+   (format "https://youtube.com/search?q=%s&ucbcb=1%s"
            (url-hexify-string query)
            (if yeetube-filter
 	       (format "&sp=%s" (yeetube-get-filter-code yeetube-filter))
 	     ""))))
 
-(defun yeetube-channel-id-at-point ()
-  "Return yeetube channel id at point."
-  (let* ((id (tabulated-list-get-id))
-	 (content (cadr (assoc id yeetube-content)))
-	 (channel-id (aref content (- (length content) 2))))
-    channel-id))
+
+;;; ---- Pagination ----
+
+(defun yeetube-set-results-limit (limit)
+  "Set the results limit for the current buffer to LIMIT.
+When called from the *yeetube* buffer, re-fetches with the new limit."
+  (interactive "nResults limit: ")
+  (setq-local yeetube--results-limit limit)
+  (if yeetube--current-url
+      (progn
+        (let ((inhibit-read-only t))
+          (erase-buffer)
+          (insert (propertize "Loading..." 'face 'bold-italic)))
+        (yeetube-display-content-from-url yeetube--current-url))
+    (message "Results limit set to %d" limit)))
+
+(defun yeetube--auto-paginate (limit)
+  "Automatically fetch next page if current items are below LIMIT."
+  (when (and yeetube--continuation
+             (< (length yeetube-items) limit))
+    (yeetube-next-page)))
+
+(defun yeetube-next-page ()
+  "Fetch and append the next page of results."
+  (interactive)
+  (unless yeetube--continuation
+    (user-error "No more results"))
+  (let* ((token (plist-get yeetube--continuation :token))
+         (api-path (plist-get yeetube--continuation :url))
+         (endpoint (concat "https://www.youtube.com" api-path))
+         (url-request-method "POST")
+         (url-request-extra-headers
+          (append yeetube-request-headers
+                  '(("Content-Type" . "application/json"))))
+         (url-request-data
+          (json-serialize
+           `((context (client (clientName . "WEB")
+                              (clientVersion . ,yeetube--client-version)))
+             (continuation . ,token)))))
+    (if yeetube-enable-tor
+        (yeetube-with-tor-socks
+         (url-retrieve endpoint #'yeetube--pagination-callback nil 'silent 'inhibit-cookies))
+      (url-retrieve endpoint #'yeetube--pagination-callback nil 'silent 'inhibit-cookies))))
+
+(defun yeetube--pagination-callback (status)
+  "Handle pagination response with STATUS."
+  (let ((url-buffer (current-buffer)))
+    (unwind-protect
+        (unless (plist-get status :error)
+          (let* ((result (with-temp-buffer
+                           (set-buffer-multibyte t)
+                           (url-insert url-buffer)
+                           (decode-coding-region (point-min) (point-max) 'utf-8)
+                           (goto-char (point-min))
+                           (search-forward "{" nil t)
+                           (backward-char)
+                           (yeetube-scraper-parse-continuation-response
+                            (json-parse-buffer :object-type 'alist
+                                               :array-type 'list))))
+                 (items (plist-get result :items))
+                 (continuation (plist-get result :continuation)))
+            (when items
+              (with-current-buffer "*yeetube*"
+                (setq yeetube-items (append yeetube-items items))
+                (setq-local yeetube--continuation continuation)
+                (yeetube-ui-append items)
+                (yeetube-ui-fetch-thumbnails items "*yeetube*")
+                (when (and continuation
+                           (< (length yeetube-items)
+                              (or yeetube--results-limit yeetube-results-limit)))
+                  (yeetube--auto-paginate
+                   (or yeetube--results-limit yeetube-results-limit)))))))
+      (kill-buffer url-buffer))))
+
+
+;;; ---- Channel browsing ----
 
 (defun yeetube-channel-videos (&optional channel-id)
   "View videos for the channel with CHANNEL-ID."
   (interactive (list (or (yeetube-channel-id-at-point)
-			 (format "@%s" (read-string "Channel: ")))))
+			  (format "@%s" (read-string "Channel: ")))))
   (with-current-buffer (get-buffer-create "*yeetube*")
     (setf yeetube--channel-id (substring channel-id 2))
     (yeetube-display-content-from-url
-     (format "https://youtube.com/%s/videos" channel-id))))
+     (format "https://youtube.com/%s/videos?ucbcb=1" channel-id))))
 
 (defun yeetube-channel-streams (&optional channel-id)
   "View streams for the channel with CHANNEL-ID."
   (interactive (list (or (yeetube-channel-id-at-point)
-			 (format "@%s" (read-string "Channel: ")))))
-  (setf yeetube--channel-id (substring channel-id 2))
-  (yeetube-display-content-from-url (format "https://youtube.com/%s/streams" channel-id)))
+			  (format "@%s" (read-string "Channel: ")))))
+  (with-current-buffer (get-buffer-create "*yeetube*")
+    (setf yeetube--channel-id (substring channel-id 2))
+    (yeetube-display-content-from-url (format "https://youtube.com/%s/streams?ucbcb=1" channel-id))))
 
 (defun yeetube-channel-search (channel-id query)
   "Search channel with CHANNEL-ID for videos matching QUERY."
   (interactive (list (yeetube-channel-id-at-point) (yeetube-read-query)))
   (yeetube-display-content-from-url
-   (format "https://youtube.com/%s/search?query=%s"
+   (format "https://youtube.com/%s/search?query=%s&ucbcb=1"
            channel-id (url-hexify-string query))))
 
-(defun yeetube-video-or-playlist-page ()
-  "View videos in playlist or those found on the video page."
-  (interactive)
-  (yeetube-display-content-from-url (yeetube-get-url)))
 
-;;;###autoload
-(defun yeetube-browse-url ()
-  "Open URL for video at point, using an invidious instance."
-  (interactive)
-  (let ((invidious-instance (cond ((and (listp yeetube-invidious-instances)
-					(length> yeetube-invidious-instances 1))
-				   (nth (random (length yeetube-invidious-instances))
-					yeetube-invidious-instances))
-				  ((and (listp yeetube-invidious-instances)
-					(length= yeetube-invidious-instances 1))
-				   (car yeetube-invidious-instances))
-				  ((stringp yeetube-invidious-instances)
-				   yeetube-invidious-instances))))
-    (browse-url
-     (replace-regexp-in-string "youtube.com" invidious-instance (yeetube-get-url)))))
+;;; ---- Mode ----
 
-(defun yeetube--scrape-string (pos item &optional sub-item)
-  "Scrape string corresponding of SUB-ITEM of ITEM after POS."
-  (goto-char pos)
-  (search-forward item nil t)
-  (when sub-item
-    (search-forward sub-item nil t))
-  (forward-char)
-  (search-forward "\"")
-  (backward-char)
-  (if (fboundp 'json-parse-buffer)
-      (json-parse-buffer)
-    (json-read)))
-
-(defun yeetube-view-count-format (string)
-  "Add commas for STRING."
-  (let* ((string (replace-regexp-in-string "[^0-9]" "" string))
-         (len (length string))
-         (result ""))
-    (cl-loop for i from 0 to (1- len)
-             do (setf result (concat (substring string (- len i 1) (- len i)) result))
-             if (and (> (- len (1+ i)) 0)
-                     (= (% (1+ i) 3) 0))
-             do (setf result (concat "," result)))
-    result))
-
-(defun yeetube-get-content ()
-  "Get content from youtube."
-  (setf yeetube-content nil)
-  (goto-char (point-min))
-  (search-forward "ytInitialData")
-  (search-forward "\"contents\"")
-  (let ((count 0)
-        (result-rx
-	 (rx "\"" (or "video" (and (or "playlist" "compact") (? "Video"))) "Renderer\""))
-        id ids videop pos)
-    ;; Keep scraping while there are results and the limit is not reached
-    (while (and (< count yeetube-results-limit)
-                (re-search-forward result-rx nil t))
-      ;; Increment count
-      (cl-incf count)
-      (setq pos (point))
-      (setq videop (not (equal (match-string 0) "\"playlistRenderer\"")))
-      (setq id (yeetube--scrape-string pos (if videop "videoId" "playlistId")))
-      (unless (member id ids)
-        (push id ids)
-        (save-excursion
-	  ;; Scrape necessary data and push to list of contents
-          (let ((title (yeetube--scrape-string pos "title"
-					       (if videop "text"
-						 "simpleText")))
-                (view-count (when videop
-			      (yeetube--scrape-string pos "viewCountText" "simpleText")))
-                (duration (if videop
-                              (yeetube--scrape-string pos "lengthText" "simpleText")
-                            (format "%s videos"
-				    (yeetube--scrape-string pos "videoCount"))))
-                (channel (yeetube--scrape-string pos "longBylineText" "text"))
-                (channel-id (yeetube--scrape-string pos "canonicalBaseUrl"))
-                (thumbnail (yeetube--scrape-string pos "thumbnail" "url"))
-                (date (when videop
-			(yeetube--scrape-string pos "publishedTimeText" "simpleText")))
-                (entry))
-	    (when (string= channel title) (setf channel yeetube--channel-id))
-            (setq thumbnail (string-replace
-                             "hq720" "default"
-                             (substring thumbnail 0 (string-search "?" thumbnail))))
-	    ;; Create an entry with properties.
-            (setq entry
-                  (list id
-			(format "[[%s.jpg]]" id)
-			(propertize
-			 (if videop title (concat "Playlist: " title))
-			 'face 'yeetube-face-title)
-                        (propertize
-			 (yeetube-view-count-format (or view-count ""))
-			 'face 'yeetube-face-view-count)
-                        (propertize duration 'face 'yeetube-face-duration)
-			(propertize (string-replace "Streamed " "" (or date ""))
-				    'face 'yeetube-face-date)
-			(propertize channel 'face 'yeetube-face-channel)
-			channel-id
-			(if videop 'video 'playlist)))
-            (yeetube--retrieve-thumbnail thumbnail entry "*yeetube*")
-	    ;; Push entry in a format to be used with tabulated-list
-            (push (list (car entry) (if yeetube-display-thumbnails-p
-					(vconcat (cdr entry))
-				      (vconcat (cddr entry))))
-		  yeetube-content))))))
-  ;; Reverse the list of entries before returning
-  (cl-callf nreverse yeetube-content))
-
-(add-variable-watcher 'yeetube-saved-videos #'yeetube-update-saved-videos-list)
-
-;; Yeetube Download:
-
-;;;###autoload
-(defun yeetube-download-change-directory ()
-  "Change download directory."
-  (interactive)
-  (setf yeetube-download-directory
-        (read-directory-name "Select a directory: ")))
-
-;;;###autoload
-(defun yeetube-download-change-audio-format (audio-format)
-  "Change download format to AUDIO-FORMAT."
-  (interactive "sSpecify Audio Format(no for nil): ")
-  (setf yeetube-download-audio-format audio-format)
-  (when (equal yeetube-download-audio-format "no")
-    (setf yeetube-download-audio-format nil)))
-
-(defun yeetube-download--ytdlp (url &optional name audio-format)
-  "Download URL using yt-dlp.
-
-Optional values:
- NAME for custom file name.
- AUDIO-FORMAT to extract and keep contents as specified audio-format only."
-  (unless yeetube-ytdlp-program
-    (error "Executable for yt-dlp not found. Please set yeetube-ytdlp-program"))
-  (let* ((tor-command (when yeetube-enable-tor yeetube-torsocks-program))
-         (name-command (when name (format "-o %s" (shell-quote-argument name))))
-         (format-command (when audio-format
-			   (format "--extract-audio --audio-format %s"
-				   (shell-quote-argument audio-format))))
-         (command (mapconcat 'identity (delq nil
-					     (list tor-command
-						   yeetube-ytdlp-program
-						   (shell-quote-argument url)
-						   name-command format-command))
-			     " ")))
-    (call-process-shell-command command nil 0)))
-
-;;;###autoload
-(defun yeetube-download-video (&optional url)
-  "Download entry at point in *yeetube* buffer with yt-dlp.
-
-Content will be downloaded at `yeetube-download-directory'.
-Optionally, provide custom own URL."
-  (interactive)
-  (save-excursion
-    (let* ((id (tabulated-list-get-id))
-	   (entry-content (cadr (assoc id yeetube-content)))
-	   (type (aref entry-content (- (length entry-content) 1)))
-	   (url (or (yeetube-get-url id type) url))
-	   (title (or (aref entry-content 1) "Unknown")))
-      (when (string-prefix-p "http" url)
-	(let ((default-directory yeetube-download-directory))
-          (yeetube-download--ytdlp url nil yeetube-download-audio-format)
-          (message "Downloading: '%s' at '%s'"
-		   title yeetube-download-directory))))))
-
-;; TODO: Add option to use ffmpeg
-;;;###autoload
-(defun yeetube-download-videos ()
-  "Bulk download videos using yt-dlp.
-This command is not meant to be used in the *Yeetube Search* buffer.
-
-Usage Example:
-Open a Dired buffer and navigate where you want to download your
-videos, then run this command interactively.  You can leave the name
-prompt blank to keep the default name."
-  (interactive)
-  (let ((download-counter 1))
-    (cl-loop
-     for url = (read-string "Enter URL (q to quit): ")
-     until (string= url "q")
-     do (let ((name (read-string (format "Custom name (download counter: %d) "
-					 download-counter))))
-          (yeetube-download--ytdlp url name yeetube-download-audio-format)
-          (cl-incf download-counter)))))
-
-(defun yeetube-propertize-vector (content &rest fields-face-pairs)
-  "Create a vector with each item propertized with its corresponding face.
-
-CONTENT is a list of strings.
-FIELDS-FACE-PAIRS is a list of fields and faces."
-  (apply #'vector
-         (cl-loop for (field face) on fields-face-pairs by #'cddr
-                  collect (propertize (cl-getf content field) 'face face))))
-
-;; Yeetube Mode
 (defvar-keymap yeetube-mode-map
   :doc "Keymap for yeetube commands"
   "RET" #'yeetube-play
   "M-RET" #'yeetube-search
-  "C-<return>" #'yeetube-video-or-playlist-page
   "b" #'yeetube-browse-url
   "c" #'yeetube-channel-videos
   "C" #'yeetube-copy-url
@@ -686,90 +575,22 @@ FIELDS-FACE-PAIRS is a list of fields and faces."
   "r" #'yeetube-replay
   "T" #'yeetube-mpv-toggle-torsocks
   "C-q" #'yeetube-mpv-change-video-quality
+  "M-n" #'yeetube-next-page
+  "C-c l" #'yeetube-set-results-limit
+  "h" #'yeetube-buffer-menu
   "q" #'quit-window)
-
-(defun yeetube--sort-views (a b)
-  "Sort entries A and B by view count."
-  (let* ((idx (if yeetube-display-thumbnails-p 2 1))
-         (views-a (string-to-number (replace-regexp-in-string "," "" (aref (cadr a) idx))))
-         (views-b (string-to-number (replace-regexp-in-string "," "" (aref (cadr b) idx)))))
-    (< views-a views-b)))
-
-(defun yeetube--duration-to-seconds (duration)
-  "Convert DURATION string in ='HH:MM:SS' format to total seconds."
-  (let* ((parts (mapcar #'string-to-number (split-string duration ":")))
-         (len (length parts)))
-    (cond
-     ((= len 3) (+ (* (nth 0 parts) 3600) (* (nth 1 parts) 60) (nth 2 parts)))
-     ((= len 2) (+ (* (nth 0 parts) 60) (nth 1 parts)))
-     ((= len 1) (nth 0 parts))
-     (t 0))))
-
-(defun yeetube--sort-duration (a b)
-  "Sort entries A and B by duration."
-  (let* ((idx (if yeetube-display-thumbnails-p 3 2))
-         (duration-a (yeetube--duration-to-seconds (aref (cadr a) idx)))
-         (duration-b (yeetube--duration-to-seconds (aref (cadr b) idx))))
-    (< duration-a duration-b)))
-
-(defun yeetube--parse-relative-date (date)
-  "Convert relative DATE like '2 days ago' to a comparable number based on seconds."
-  (let* ((split-date (split-string date " "))
-         (value (string-to-number (nth 0 split-date)))
-         (unit (nth 1 split-date))
-         (seconds-per-unit
-	  (cond
-           ((or (string= "second" unit) (string= "seconds" unit)) 1)
-           ((or (string= "minute" unit) (string= "minutes" unit)) 60)
-           ((or (string= "hour" unit) (string= "hours" unit)) (* 60 60))
-           ((or (string= "day" unit) (string= "days" unit)) (* 60 60 24))
-           ((or (string= "week" unit) (string= "weeks" unit)) (* 60 60 24 7))
-           ((or (string= "month" unit) (string= "months" unit)) (* 60 60 24 30))
-           ((or (string= "year" unit) (string= "years" unit)) (* 60 60 24 365))
-           (t 0))))
-    (* value seconds-per-unit)))
-
-(defun yeetube--sort-date (a b)
-  "Sort entries A and B by relative date."
-  (let* ((idx (if yeetube-display-thumbnails-p 4 3))
-         (date-a (yeetube--parse-relative-date (aref (cadr a) idx)))
-         (date-b (yeetube--parse-relative-date (aref (cadr b) idx))))
-    (< date-a date-b)))
-
-(defun yeetube--tabulated-list-format (thumbnail-p)
-  "Return tabulated-list format vector.
-
-If THUMBNAIL-P is non-nil, add thumbnail."
-  (let ((list-format `[("Thumbnail"  ,(ceiling (/ (float (car yeetube-thumbnail-size)) (frame-char-width))) nil)
-		       ("Title" ,(/ (window-width) 3) t)
-		       ("Views" ,(/ (window-width) 10) yeetube--sort-views)
-		       ("Duration" ,(/ (window-width) 10)  yeetube--sort-duration)
-		       ("Date" ,(/ (window-width) 8) yeetube--sort-date)
-		       ("Channel" ,(/ (window-width) 8) t)]))
-    (if thumbnail-p list-format (cl-subseq list-format 1))))
-
-(defun yeetube-tabulated-list (&optional thumbnail-p)
-  "Return a tabulated list, adjusted for `window-width'.
-
-If THUMBNAIL-P is non-nil, display thumbnails."
-  (let ((thumbnail-p (or thumbnail-p yeetube-display-thumbnails-p)))
-    (setf tabulated-list-format (yeetube--tabulated-list-format thumbnail-p)
-	  tabulated-list-entries yeetube-content
-	  tabulated-list-sort-key
-	  (cons yeetube-default-sort-column yeetube-default-sort-ascending))
-    (tabulated-list-print)))
 
 (define-derived-mode yeetube-mode tabulated-list-mode "Yeetube"
   "Yeetube mode."
   :keymap yeetube-mode-map
   (setq-local truncate-string-ellipsis " ")
-  (yeetube-tabulated-list)
-  (setq-local yeetube-mpv-show-status t)
   (display-line-numbers-mode 0)
-  (tabulated-list-init-header)
   (when (and (fboundp 'emojify-mode)
 	     yeetube-enable-emojis)
     (emojify-mode 1)))
+
+;;;###autoload
+(defalias 'yeetube #'yeetube-menu)
 
 (provide 'yeetube)
 ;;; yeetube.el ends here
