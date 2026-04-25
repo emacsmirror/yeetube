@@ -1,0 +1,13 @@
+*.elc
+
+*-autoloads.el
+*pkg.el
+.*
+!.gitignore
+!.elpaignore
+\#*
+
+*.md
+*.info
+*.texi
+refs/*
