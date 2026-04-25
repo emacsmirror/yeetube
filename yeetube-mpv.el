@@ -26,28 +26,21 @@
 
 ;;; Code:
 
-;; silence byte-compiler
+;; Variables defined in yeetube.el (via define-described-keymap)
 (defvar yeetube-ytdlp-program)
 (defvar yeetube-torsocks-program)
+(defvar yeetube-mpv-video-quality)
+(defvar yeetube-mpv-enable-torsocks)
 
 (defcustom yeetube-mpv-program (executable-find "mpv")
   "Path for mpv executable."
   :type 'string
   :group 'yeetube)
 
-(defcustom yeetube-mpv-enable-torsocks nil
-  "Enable torsocks."
-  :type 'boolean
-  :group 'yeetube)
-
 (defcustom yeetube-mpv-additional-flags nil
   "Additional flags to pass to mpv."
   :type '(repeat string)
   :group 'yeetube)
-
-(defvar yeetube-mpv-video-quality "720"
-  "Video resolution/quality.
-Accepted values include: 1080, 720, 480, 360, 240, 144")
 
 (defvar yeetube-mpv-currently-playing nil
   "Currently playing information.")
@@ -57,22 +50,6 @@ Accepted values include: 1080, 720, 480, 360, 240, 144")
   (if yeetube-mpv-currently-playing
       (format "%s" yeetube-mpv-currently-playing)
     "nil"))
-
-(defun yeetube-mpv-change-video-quality ()
-  "Change video quality."
-  (interactive)
-  (let ((new-value (completing-read (format "Set video quality (current value %s):" yeetube-mpv-video-quality)
-				    '("1080" "720" "480" "360" "240" "144") nil t)))
-    (setf yeetube-mpv-video-quality new-value)))
-
-(defun yeetube-mpv-toggle-torsocks ()
-  "Toggle torsocks."
-  (interactive)
-  (pcase yeetube-mpv-enable-torsocks
-    ('t (setf yeetube-mpv-enable-torsocks nil)
-	(message "yeetube: Torsocks disabled"))
-    ('nil (setf yeetube-mpv-enable-torsocks t)
-	  (message "yeetube: Torsocks enabled"))))
 
 (defun yeetube-mpv-check ()
   "Check if mpv and yt-dlp is installed."

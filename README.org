@@ -62,9 +62,13 @@ $ sudo apt install mpv yt-dlp
 :CUSTOM_ID: usage
 :END:
 
-- =M-x yeetube= opens the transient menu with search, download and settings
+- =M-x yeetube= opens the popup menu with search, download and settings
 - =M-x yeetube-search= to search directly
 - In the results buffer, press =h= to see all available keybindings
+
+Settings like video quality, torsocks and results limit can be
+toggled per-buffer directly from the popup (=h=).  They show their
+current value inline.
 
 ** Configuration
 :PROPERTIES:
@@ -121,7 +125,7 @@ By default, yeetube fetches 20 results per search.  You can change this:
 (setf yeetube-results-limit 50)
 #+end_src
 
-You can also change it per-buffer via the transient menu (=h= then =n=).
+You can also change it per-buffer via the popup menu (=h= then =n=).
 When the limit exceeds results on one page, additional pages are
 fetched automatically.
 
@@ -132,13 +136,13 @@ fetched automatically.
 For enhanced privacy, using tor & torsocks:
 
 #+begin_src emacs-lisp
-(setf yeetube-enable-tor t
-      yeetube-mpv-enable-torsocks t) ;; if you are using yeetube-mpv as your media player
+(setf yeetube-enable-tor t)
 #+end_src
+
+You can also toggle torsocks for mpv per-buffer from the popup
+menu (=h= then =T=).
 
 It's recommended to disable thumbnail support to improve performance
 when using tor.
 
 Yeetube is configured to use tor via port 9050.
-
-/You can toggle that option for mpv with =yeetube-mpv-toggle-torsocks=/

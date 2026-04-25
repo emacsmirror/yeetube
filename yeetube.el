@@ -7,7 +7,7 @@
 ;; URL: https://thanosapollo.org/projects/yeetube/
 ;; Version: 2.2.0
 
-;; Package-Requires: ((emacs "27.2") (compat "29.1.4.2") (transient "0.7.2"))
+;; Package-Requires: ((emacs "29.1") (compat "29.1.4.2"))
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -45,11 +45,11 @@
 (require 'xdg)
 (require 'json)
 
+(require 'keymap-popup)
 (require 'yeetube-scraper)
 (require 'yeetube-ui)
 (require 'yeetube-mpv)
 (require 'yeetube-download)
-(require 'yeetube-menu)
 
 (defgroup yeetube nil
   "Youtube Front-End."
@@ -159,8 +159,13 @@ Valid options include:
 (defvar-local yeetube--continuation nil
   "Continuation plist for pagination.")
 
-(defvar-local yeetube--results-limit nil
-  "Buffer-local results limit.")
+;; Defined by define-described-keymap, declared here for byte-compiler
+(defvar yeetube--results-limit)
+(defvar yeetube--download-directory)
+(defvar yeetube--audio-format)
+(defvar yeetube-mpv-video-quality)
+(defvar yeetube-mpv-enable-torsocks)
+(defvar yeetube--show-settings)
 
 (defvar-local yeetube--current-url nil
   "URL that produced the current results.
@@ -409,9 +414,11 @@ Optionally, provide custom own URL."
          (url (or url (yeetube-get-url id type)))
          (title (or (plist-get item :title) "Unknown")))
     (when (string-prefix-p "http" url)
-      (let ((default-directory yeetube-download-directory))
-        (yeetube-download--ytdlp url nil yeetube-download-audio-format)
-        (message "Downloading: '%s' at '%s'" title yeetube-download-directory)))))
+      (let ((default-directory (or yeetube--download-directory
+                                   yeetube-download-directory)))
+        (yeetube-download--ytdlp url nil (or yeetube--audio-format
+                                              yeetube-download-audio-format))
+        (message "Downloading: '%s' at '%s'" title default-directory)))))
 
 
 ;;; Search & Callbacks
@@ -473,19 +480,6 @@ Optionally, provide custom own URL."
 
 
 ;;; Pagination
-
-(defun yeetube-set-results-limit (limit)
-  "Set the results limit for the current buffer to LIMIT.
-When called from the *yeetube* buffer, re-fetches with the new limit."
-  (interactive "nResults limit: ")
-  (setq-local yeetube--results-limit limit)
-  (if yeetube--current-url
-      (progn
-        (let ((inhibit-read-only t))
-          (erase-buffer)
-          (insert (propertize "Loading..." 'face 'bold-italic)))
-        (yeetube-display-content-from-url yeetube--current-url))
-    (message "Results limit set to %d" limit)))
 
 (defun yeetube--auto-paginate (limit)
   "Automatically fetch next page if current items are below LIMIT."
@@ -575,37 +569,81 @@ When called from the *yeetube* buffer, re-fetches with the new limit."
 
 ;;; Mode
 
-(defvar-keymap yeetube-mode-map
-  :doc "Keymap for yeetube commands"
-  "RET" #'yeetube-play
-  "s" #'yeetube-search
-  "M-n" #'yeetube-next-page
-  "c" #'yeetube-channel-videos
-  "L" #'yeetube-channel-streams
-  "r" #'yeetube-replay
-  "P" #'yeetube-play-saved-video
-  "S" #'yeetube-save-video
-  "C" #'yeetube-copy-url
-  "R" #'yeetube-copy-rss-feed-url
-  "b" #'yeetube-browse-url
-  "d" #'yeetube-download-video
-  "p" #'yeetube-mpv-toggle-pause
-  "v" #'yeetube-mpv-toggle-video
-  "V" #'yeetube-mpv-toggle-no-video-flag
-  "h" #'yeetube-buffer-menu
-  "q" #'quit-window)
+(defun yeetube--read-video-quality (prompt)
+  "Read video quality with PROMPT."
+  (completing-read prompt '("1080" "720" "480" "360" "240" "144") nil t))
+
+(defun yeetube--read-audio-format (prompt)
+  "Read audio format with PROMPT."
+  (let ((choice (completing-read prompt
+                 '("none" "aac" "alac" "flac" "m4a" "mp3" "opus" "vorbis" "wav")
+                 nil t)))
+    (if (equal choice "none") nil choice)))
+
+(defun yeetube--read-directory (prompt)
+  "Read directory with PROMPT."
+  (read-directory-name prompt))
+
+(define-described-keymap yeetube-mode-map
+  "Yeetube"
+
+  :group "Play"
+  "RET" ("Play" yeetube-play)
+  "r"   ("Replay" yeetube-replay)
+  "P"   ("Play saved" yeetube-play-saved-video)
+
+  :group "Navigate"
+  "s"   ("Search" yeetube-search)
+  "M-n" ("Next page" yeetube-next-page)
+  "c"   ("Channel videos" yeetube-channel-videos)
+  "L"   ("Channel streams" yeetube-channel-streams)
+
+  :group "Actions"
+  "S"   ("Save video" yeetube-save-video)
+  "C"   ("Copy URL" yeetube-copy-url)
+  "R"   ("Copy RSS feed" yeetube-copy-rss-feed-url)
+  "b"   ("Browse (invidious)" yeetube-browse-url)
+  "d"   ("Download" yeetube-download-video)
+  "o"   ("Settings" :switch yeetube--show-settings)
+
+  :group "Settings"
+  "p"   ("Toggle pause" yeetube-mpv-toggle-pause :if (lambda () yeetube--show-settings))
+  "v"   ("Toggle video" yeetube-mpv-toggle-video :if (lambda () yeetube--show-settings))
+  "V"   ("No-video flag" yeetube-mpv-toggle-no-video-flag :if (lambda () yeetube--show-settings))
+  "T"   ("Torsocks" :switch yeetube-mpv-enable-torsocks :if (lambda () yeetube--show-settings))
+  "n"   ("Results limit" :option yeetube--results-limit
+         :reader read-number :prompt "Results limit: " :if (lambda () yeetube--show-settings))
+  "Q"   ("Video quality" :option yeetube-mpv-video-quality
+         :reader yeetube--read-video-quality :prompt "Video quality: "
+         :if (lambda () yeetube--show-settings))
+  "D"   ("Download dir" :option yeetube--download-directory
+         :reader yeetube--read-directory :prompt "Download dir: "
+         :if (lambda () yeetube--show-settings))
+  "a"   ("Audio format" :option yeetube--audio-format
+         :reader yeetube--read-audio-format :prompt "Audio format: "
+         :if (lambda () yeetube--show-settings)))
 
 (define-derived-mode yeetube-mode tabulated-list-mode "Yeetube"
   "Yeetube mode."
   :keymap yeetube-mode-map
   (setq-local truncate-string-ellipsis " ")
+  ;; Set defaults for macro-generated buffer-local vars
+  (unless yeetube--results-limit
+    (setq-local yeetube--results-limit yeetube-results-limit))
+  (unless yeetube-mpv-video-quality
+    (setq-local yeetube-mpv-video-quality "720"))
+  (unless yeetube--download-directory
+    (setq-local yeetube--download-directory yeetube-download-directory))
+  (unless yeetube--audio-format
+    (setq-local yeetube--audio-format yeetube-download-audio-format))
   (display-line-numbers-mode 0)
   (when (and (fboundp 'emojify-mode)
 	     yeetube-enable-emojis)
     (emojify-mode 1)))
 
 ;;;###autoload
-(defalias 'yeetube #'yeetube-menu)
+(defalias 'yeetube (lambda () (interactive)
+                     (keymap-popup 'yeetube-mode-map)))
 
 (provide 'yeetube)
 ;;; yeetube.el ends here

@@ -1,2 +1,2 @@
 (specifications->manifest
- '("emacs-no-x" "emacs-compat" "emacs-transient"))
+ '("emacs-no-x" "emacs-compat"))
