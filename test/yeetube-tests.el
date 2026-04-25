@@ -120,17 +120,21 @@
 
 ;;; Group 7: yeetube-mode-map keybindings
 
-(ert-deftest yeetube-test-keymap-S-not-bound ()
-  "S key is not bound in yeetube-mode-map, leaving tabulated-list-sort accessible."
-  (should-not (lookup-key yeetube-mode-map "S")))
+(ert-deftest yeetube-test-keymap-s-bound-to-search ()
+  "Lowercase s is bound to yeetube-search."
+  (should (eq 'yeetube-search (lookup-key yeetube-mode-map "s"))))
+
+(ert-deftest yeetube-test-keymap-S-bound-to-save-video ()
+  "S key is bound to yeetube-save-video."
+  (should (eq 'yeetube-save-video (lookup-key yeetube-mode-map "S"))))
 
 (ert-deftest yeetube-test-keymap-L-bound-to-channel-streams ()
   "L key is bound to yeetube-channel-streams."
   (should (eq 'yeetube-channel-streams (lookup-key yeetube-mode-map "L"))))
 
-(ert-deftest yeetube-test-keymap-s-bound-to-save-video ()
-  "Lowercase s remains bound to yeetube-save-video."
-  (should (eq 'yeetube-save-video (lookup-key yeetube-mode-map "s"))))
+(ert-deftest yeetube-test-keymap-R-bound-to-rss-feed ()
+  "R key is bound to yeetube-copy-rss-feed-url."
+  (should (eq 'yeetube-copy-rss-feed-url (lookup-key yeetube-mode-map "R"))))
 
 (ert-deftest yeetube-test-keymap-M-n-bound-to-next-page ()
   "M-n is bound to yeetube-next-page."
