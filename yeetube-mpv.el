@@ -61,7 +61,7 @@
   (yeetube-mpv-check)
   (let ((proc-name "yeetube"))
     (dolist (process (process-list))
-      (when (string-match proc-name (process-name process))
+      (when (string= proc-name (process-name process))
 	(kill-process process)))
     (sit-for 0.1)
     (unless (get-process proc-name)
