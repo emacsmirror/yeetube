@@ -603,8 +603,12 @@ Optionally, provide custom own URL."
   "d"   ("Download" yeetube-download-video)
   "o"   ("Settings" :switch yeetube--show-settings)
   :group "Settings"
-  "p"   ("Toggle pause" yeetube-mpv-toggle-pause :if (lambda () yeetube--show-settings))
-  "v"   ("Toggle video" yeetube-mpv-toggle-video :if (lambda () yeetube--show-settings))
+  "p"   ("Toggle pause" yeetube-mpv-toggle-pause
+         :if (lambda () yeetube--show-settings)
+         :inapt-if (lambda () (not (get-process "yeetube"))))
+  "v"   ("Toggle video" yeetube-mpv-toggle-video
+         :if (lambda () yeetube--show-settings)
+         :inapt-if (lambda () (not (get-process "yeetube"))))
   "V"   ("No-video flag" yeetube-mpv-toggle-no-video-flag :if (lambda () yeetube--show-settings))
   "T"   ("Torsocks" :switch yeetube-mpv-enable-torsocks :if (lambda () yeetube--show-settings))
   "n"   ("Results limit" :option yeetube--results-limit
