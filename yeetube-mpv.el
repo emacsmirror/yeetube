@@ -26,7 +26,7 @@
 
 ;;; Code:
 
-;; Variables defined in yeetube.el (via define-described-keymap)
+;; Variables defined in yeetube.el (via keymap-popup-define)
 (defvar yeetube-ytdlp-program)
 (defvar yeetube-torsocks-program)
 (defvar yeetube-mpv-video-quality)

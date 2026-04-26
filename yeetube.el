@@ -159,7 +159,7 @@ Valid options include:
 (defvar-local yeetube--continuation nil
   "Continuation plist for pagination.")
 
-;; Defined by define-described-keymap, declared here for byte-compiler
+;; Defined by keymap-popup-define, declared here for byte-compiler
 (defvar yeetube--results-limit)
 (defvar yeetube--download-directory)
 (defvar yeetube--audio-format)
@@ -584,7 +584,7 @@ Optionally, provide custom own URL."
   "Read directory with PROMPT."
   (read-directory-name prompt))
 
-(define-described-keymap yeetube-mode-map
+(keymap-popup-define yeetube-mode-map
   "Yeetube Mode Map"
   :group "Play"
   "RET" ("Play" yeetube-play)
