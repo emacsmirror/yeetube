@@ -2,7 +2,7 @@
 
 ;; Author: Thanos Apollo
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "29.1") (keymap-popup "0.1.0"))
+;; Package-Requires: ((emacs "29.1"))
 ;; Keywords: convenience
 ;; URL: https://thanosapollo.org/projects/keymap-popup
 

@@ -7,7 +7,7 @@
 ;; URL: https://thanosapollo.org/projects/yeetube/
 ;; Version: 2.2.0
 
-;; Package-Requires: ((emacs "29.1") (compat "29.1.4.2"))
+;; Package-Requires: ((emacs "29.1") (compat "29.1.4.2") (keymap-popup "0.1.0"))
 
 ;; This program is free software; you can redistribute it and/or modify
 ;; it under the terms of the GNU General Public License as published by
@@ -166,6 +166,7 @@ Valid options include:
 (defvar yeetube-mpv-video-quality)
 (defvar yeetube-mpv-enable-torsocks)
 (defvar yeetube-mpv-no-video)
+(defvar yeetube-mpv--process-name)
 (defvar yeetube--show-settings)
 
 (defvar-local yeetube--current-url nil
@@ -606,10 +607,10 @@ Optionally, provide custom own URL."
   :group "Settings"
   "p"   ("Toggle pause" yeetube-mpv-toggle-pause
          :if (lambda () yeetube--show-settings)
-         :inapt-if (lambda () (not (get-process "yeetube"))))
+         :inapt-if (lambda () (not (get-process yeetube-mpv--process-name))))
   "v"   ("Toggle video" yeetube-mpv-toggle-video
          :if (lambda () yeetube--show-settings)
-         :inapt-if (lambda () (not (get-process "yeetube"))))
+         :inapt-if (lambda () (not (get-process yeetube-mpv--process-name))))
   "V"   ("No video" :switch yeetube-mpv-no-video :if (lambda () yeetube--show-settings))
   "T"   ("Torsocks" :switch yeetube-mpv-enable-torsocks :if (lambda () yeetube--show-settings))
   "n"   ("Results limit" :option yeetube--results-limit

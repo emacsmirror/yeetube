@@ -33,6 +33,9 @@
 (defvar yeetube-mpv-enable-torsocks)
 (defvar yeetube-mpv-no-video)
 
+(defconst yeetube-mpv--process-name "yeetube-mpv"
+  "Name of the mpv subprocess.")
+
 (defcustom yeetube-mpv-program (executable-find "mpv")
   "Path for mpv executable."
   :type 'string
@@ -60,14 +63,13 @@
 (defun yeetube-mpv-process (command)
   "Start yeetube process for shell COMMAND."
   (yeetube-mpv-check)
-  (let ((proc-name "yeetube"))
-    (dolist (process (process-list))
-      (when (string= proc-name (process-name process))
-	(kill-process process)))
-    (sit-for 0.1)
-    (unless (get-process proc-name)
-      (start-process-shell-command
-       proc-name "*yeetube-output*" command))))
+  (dolist (process (process-list))
+    (when (string= yeetube-mpv--process-name (process-name process))
+      (kill-process process)))
+  (sit-for 0.1)
+  (unless (get-process yeetube-mpv--process-name)
+    (start-process-shell-command
+     yeetube-mpv--process-name "*yeetube-mpv-output*" command)))
 
 (defun yeetube-mpv-ytdl-format-video-quality (resolution)
   "Return shell quoted argument for ytdlp with RESOLUTION."
@@ -123,7 +125,9 @@ To use this mode, you should set `yeetube-play-function' to
 (defun yeetube-mpv-send-keypress (key)
   "Send KEY to `yeetube-mpv-process'."
   (interactive "sKey: ")
-  (process-send-string "yeetube" key))
+  (unless (get-process yeetube-mpv--process-name)
+    (user-error "No mpv process running"))
+  (process-send-string yeetube-mpv--process-name key))
 
 (defun yeetube-mpv-toggle-pause ()
   "Toggle pause mpv."
