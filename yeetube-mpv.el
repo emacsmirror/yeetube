@@ -31,6 +31,7 @@
 (defvar yeetube-torsocks-program)
 (defvar yeetube-mpv-video-quality)
 (defvar yeetube-mpv-enable-torsocks)
+(defvar yeetube-mpv-no-video)
 
 (defcustom yeetube-mpv-program (executable-find "mpv")
   "Path for mpv executable."
@@ -80,15 +81,17 @@ INFO is optional information to display with `yeetube-mpv-modeline-mode'.
 
 This function is not specific to just playing URLs.  Feel free to use
 it to play local files."
-  (let* ((yeetube-command
+  (let* ((base-flags (remove "--no-video" yeetube-mpv-additional-flags))
+         (flags (append (when yeetube-mpv-no-video '("--no-video"))
+                        base-flags))
+         (yeetube-command
 	  (concat (when yeetube-mpv-enable-torsocks (concat yeetube-torsocks-program " "))
 		  yeetube-mpv-program " --ytdl-format="
 		  (yeetube-mpv-ytdl-format-video-quality yeetube-mpv-video-quality)
 		  " "
 		  (shell-quote-argument input)
-		  (if yeetube-mpv-additional-flags
-		      (concat " " (mapconcat #'identity yeetube-mpv-additional-flags " "))
-		    ""))))
+		  (when flags
+		    (concat " " (mapconcat #'identity flags " "))))))
     (let ((proc (yeetube-mpv-process yeetube-command)))
       (message "Yeetube command: %s" yeetube-command)
       (message (if yeetube-mpv-enable-torsocks
@@ -116,16 +119,6 @@ To use this mode, you should set `yeetube-play-function' to
                              (string-prefix-p " ♫:" (format "%s" (eval (cadr item))))))
                       global-mode-string))
     (force-mode-line-update)))
-
-(defun yeetube-mpv-toggle-no-video-flag ()
-  "Toggle no video flag for mpv player."
-  (interactive)
-  (if (member "--no-video" yeetube-mpv-additional-flags)
-      (progn (setf yeetube-mpv-additional-flags
-		   (remove "--no-video" yeetube-mpv-additional-flags))
-	     (message "yeetube: mpv enabled video"))
-    (push "--no-video" yeetube-mpv-additional-flags)
-    (message "yeetube: mpv disabled video")))
 
 (defun yeetube-mpv-send-keypress (key)
   "Send KEY to `yeetube-mpv-process'."

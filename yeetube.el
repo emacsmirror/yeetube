@@ -165,6 +165,7 @@ Valid options include:
 (defvar yeetube--audio-format)
 (defvar yeetube-mpv-video-quality)
 (defvar yeetube-mpv-enable-torsocks)
+(defvar yeetube-mpv-no-video)
 (defvar yeetube--show-settings)
 
 (defvar-local yeetube--current-url nil
@@ -609,7 +610,7 @@ Optionally, provide custom own URL."
   "v"   ("Toggle video" yeetube-mpv-toggle-video
          :if (lambda () yeetube--show-settings)
          :inapt-if (lambda () (not (get-process "yeetube"))))
-  "V"   ("No-video flag" yeetube-mpv-toggle-no-video-flag :if (lambda () yeetube--show-settings))
+  "V"   ("No video" :switch yeetube-mpv-no-video :if (lambda () yeetube--show-settings))
   "T"   ("Torsocks" :switch yeetube-mpv-enable-torsocks :if (lambda () yeetube--show-settings))
   "n"   ("Results limit" :option yeetube--results-limit
          :reader read-number :prompt "Results limit: " :if (lambda () yeetube--show-settings))
@@ -636,6 +637,8 @@ Optionally, provide custom own URL."
     (setq-local yeetube--download-directory yeetube-download-directory))
   (unless yeetube--audio-format
     (setq-local yeetube--audio-format yeetube-download-audio-format))
+  (setq-local yeetube-mpv-no-video
+              (member "--no-video" yeetube-mpv-additional-flags))
   (display-line-numbers-mode 0)
   (when (and (fboundp 'emojify-mode)
 	     yeetube-enable-emojis)
