@@ -66,9 +66,8 @@ Optional values:
 (defun yeetube-download-change-audio-format (audio-format)
   "Change download format to AUDIO-FORMAT."
   (interactive "sSpecify Audio Format(no for nil): ")
-  (setf yeetube-download-audio-format audio-format)
-  (when (equal yeetube-download-audio-format "no")
-    (setf yeetube-download-audio-format nil)))
+  (setf yeetube-download-audio-format (and (not (equal audio-format "no"))
+                                           audio-format)))
 
 ;; TODO: Add option to use ffmpeg
 ;;;###autoload

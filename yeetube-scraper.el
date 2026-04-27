@@ -191,10 +191,11 @@ Return plist (:items ITEMS :continuation CONT)."
 				       (alist-get 'tabRenderer tab))))
                     tabs))
          (grid-contents
-          (alist-get 'contents
-		     (alist-get 'richGridRenderer
-				(alist-get 'content
-					   (alist-get 'tabRenderer selected)))))
+          (thread-last
+            (alist-get 'tabRenderer selected)
+            (alist-get 'content)
+            (alist-get 'richGridRenderer)
+            (alist-get 'contents)))
          (items (yeetube-scraper--extract-grid-items grid-contents))
          (continuation (yeetube-scraper--extract-continuation grid-contents)))
     (list :items items :continuation continuation)))

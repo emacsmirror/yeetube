@@ -56,11 +56,11 @@
   :group 'external
   :prefix "yeetube-")
 
-(defcustom yeetube-torsocks-program (executable-find "torsocks")
+(defcustom yeetube-torsocks-program (and (executable-find "torsocks") "torsocks")
   "Path for torsocks executable."
   :type 'string)
 
-(defcustom yeetube-ytdlp-program (executable-find "yt-dlp")
+(defcustom yeetube-ytdlp-program (and (executable-find "yt-dlp") "yt-dlp")
   "Path for yt-dlp executable."
   :type 'string)
 
@@ -116,7 +116,7 @@ Valid options include:
   "Enable routing through tor."
   :type 'boolean)
 
-(defcustom yeetube-enable-emojis t
+(defcustom yeetube-enable-emojis (and (char-displayable-p ?\N{GRINNING FACE}) t)
   "Enable emojis in *yeetube* buffer."
   :type 'boolean)
 
@@ -567,10 +567,6 @@ Optionally, provide custom own URL."
 				 nil t)))
     (if (equal choice "none") nil choice)))
 
-(defun yeetube--read-directory (prompt)
-  "Read directory with PROMPT."
-  (read-directory-name prompt))
-
 (keymap-popup-define yeetube-mode-map
   "Yeetube Mode Map"
   :group "Play"
@@ -604,7 +600,7 @@ Optionally, provide custom own URL."
          :reader yeetube--read-video-quality :prompt "Video quality: "
          :if (lambda () yeetube--show-settings))
   "D"   ("Download dir" :option yeetube--download-directory
-         :reader yeetube--read-directory :prompt "Download dir: "
+         :reader read-directory-name :prompt "Download dir: "
          :if (lambda () yeetube--show-settings))
   "a"   ("Audio format" :option yeetube--audio-format
          :reader yeetube--read-audio-format :prompt "Audio format: "

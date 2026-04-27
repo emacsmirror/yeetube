@@ -36,7 +36,7 @@
 (defconst yeetube-mpv--process-name "yeetube-mpv"
   "Name of the mpv subprocess.")
 
-(defcustom yeetube-mpv-program (executable-find "mpv")
+(defcustom yeetube-mpv-program (and (executable-find "mpv") "mpv")
   "Path for mpv executable."
   :type 'string
   :group 'yeetube)
@@ -102,6 +102,9 @@ it to play local files."
       (setf yeetube-mpv-currently-playing (format "[%s]" info))
       proc)))
 
+(defconst yeetube-mpv-modeline-string
+  '(:eval (format " ♫:%s" (yeetube-mpv-modeline-string))))
+
 (define-minor-mode yeetube-mpv-modeline-mode
   "Minor mode for showing currently playing information on the modeline.
 
@@ -111,16 +114,9 @@ To use this mode, you should set `yeetube-play-function' to
   :group 'yeetube
   :lighter nil
   (if yeetube-mpv-modeline-mode
-      (progn
-	(add-to-list 'global-mode-string '(:eval
-					   (format " ♫:%s" (yeetube-mpv-modeline-string))))
-	(force-mode-line-update))
-    (setf global-mode-string
-          (seq-remove (lambda (item)
-                        (and (listp item) (eq (car item) :eval)
-                             (string-prefix-p " ♫:" (format "%s" (eval (cadr item))))))
-                      global-mode-string))
-    (force-mode-line-update)))
+      (add-to-list 'global-mode-string yeetube-mpv-modeline-string)
+    (cl-callf2 delq yeetube-mpv-modeline-string global-mode-string))
+  (force-mode-line-update))
 
 (defun yeetube-mpv-send-keypress (key)
   "Send KEY to `yeetube-mpv-process'."

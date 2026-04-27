@@ -146,13 +146,11 @@ The vector layout depends on `yeetube-display-thumbnails-p'."
 
 (defun yeetube-ui--duration-to-seconds (duration)
   "Convert DURATION string in HH:MM:SS format to total seconds."
-  (let* ((parts (mapcar #'string-to-number (split-string duration ":")))
-         (len (length parts)))
-    (pcase len
-      (3 (+ (* (nth 0 parts) 3600) (* (nth 1 parts) 60) (nth 2 parts)))
-      (2 (+ (* (nth 0 parts) 60) (nth 1 parts)))
-      (1 (nth 0 parts))
-      (_ 0))))
+  (pcase (mapcar #'string-to-number (split-string duration ":"))
+    (`(,h ,m ,s) (+ (* h 3600) (* m 60) s))
+    (`(,m ,s) (+ (* m 60) s))
+    (`(,s) s)
+    (_ 0)))
 
 (defun yeetube-ui--parse-relative-date (date)
   "Convert relative DATE like \"2 days ago\" to comparable seconds."
