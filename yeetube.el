@@ -621,10 +621,7 @@ Optionally, provide custom own URL."
     (setq-local yeetube--audio-format yeetube-download-audio-format))
   (setq-local yeetube-mpv-no-video
               (member "--no-video" yeetube-mpv-additional-flags))
-  (display-line-numbers-mode 0)
-  (when (and (fboundp 'emojify-mode)
-	     yeetube-enable-emojis)
-    (emojify-mode 1)))
+  (display-line-numbers-mode 0))
 
 ;;;###autoload
 (defalias 'yeetube (lambda () (interactive)
