@@ -103,8 +103,8 @@
   "Plist converts to row without thumbnail column."
   (let* ((yeetube-display-thumbnails-p nil)
          (entry '(:id "abc" :title "Test Title" :views "1000"
-                  :duration "3:00" :date "1 day ago"
-                  :channel "TestCh" :channel-id "/@testch" :type video))
+                      :duration "3:00" :date "1 day ago"
+                      :channel "TestCh" :channel-id "/@testch" :type video))
          (row (yeetube-ui--entry-to-row entry))
          (id (car row))
          (vec (cadr row)))
@@ -122,8 +122,8 @@
   "Plist converts to row with thumbnail placeholder."
   (let* ((yeetube-display-thumbnails-p t)
          (entry '(:id "abc" :title "Test Title" :views "1000"
-                  :duration "3:00" :date "1 day ago"
-                  :channel "TestCh" :channel-id "/@testch" :type video))
+                      :duration "3:00" :date "1 day ago"
+                      :channel "TestCh" :channel-id "/@testch" :type video))
          (row (yeetube-ui--entry-to-row entry))
          (vec (cadr row)))
     ;; thumbnail=0, title=1, views=2, duration=3, date=4, channel=5
@@ -135,7 +135,7 @@
   "Playlist entries get a \"Playlist: \" prefix in the title."
   (let* ((yeetube-display-thumbnails-p nil)
          (entry '(:id "PLxyz" :title "My List" :views "" :duration ""
-                  :date "" :channel "Ch" :channel-id "/@ch" :type playlist))
+                      :date "" :channel "Ch" :channel-id "/@ch" :type playlist))
          (row (yeetube-ui--entry-to-row entry))
          (vec (cadr row)))
     (should (string-match-p "Playlist: My List" (aref vec 0)))))

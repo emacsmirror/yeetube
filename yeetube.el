@@ -419,7 +419,7 @@ Optionally, provide custom own URL."
       (let ((default-directory (or yeetube--download-directory
                                    yeetube-download-directory)))
         (yeetube-download--ytdlp url nil (or yeetube--audio-format
-                                              yeetube-download-audio-format))
+                                             yeetube-download-audio-format))
         (message "Downloading: '%s' at '%s'" title default-directory)))))
 
 
@@ -547,7 +547,7 @@ Optionally, provide custom own URL."
 (defun yeetube-channel-videos (&optional channel-id)
   "View videos for the channel with CHANNEL-ID."
   (interactive (list (or (yeetube-channel-id-at-point)
-			  (format "@%s" (read-string "Channel: ")))))
+			 (format "@%s" (read-string "Channel: ")))))
   (with-current-buffer (get-buffer-create "*yeetube*")
     (setf yeetube--channel-id (substring channel-id 2))
     (yeetube-display-content-from-url
@@ -556,7 +556,7 @@ Optionally, provide custom own URL."
 (defun yeetube-channel-streams (&optional channel-id)
   "View streams for the channel with CHANNEL-ID."
   (interactive (list (or (yeetube-channel-id-at-point)
-			  (format "@%s" (read-string "Channel: ")))))
+			 (format "@%s" (read-string "Channel: ")))))
   (with-current-buffer (get-buffer-create "*yeetube*")
     (setf yeetube--channel-id (substring channel-id 2))
     (yeetube-display-content-from-url (format "https://youtube.com/%s/streams?ucbcb=1" channel-id))))
@@ -578,8 +578,8 @@ Optionally, provide custom own URL."
 (defun yeetube--read-audio-format (prompt)
   "Read audio format with PROMPT."
   (let ((choice (completing-read prompt
-                 '("none" "aac" "alac" "flac" "m4a" "mp3" "opus" "vorbis" "wav")
-                 nil t)))
+				 '("none" "aac" "alac" "flac" "m4a" "mp3" "opus" "vorbis" "wav")
+				 nil t)))
     (if (equal choice "none") nil choice)))
 
 (defun yeetube--read-directory (prompt)

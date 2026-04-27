@@ -34,7 +34,7 @@
          (byline-runs (alist-get 'runs (alist-get 'longBylineText renderer)))
          (channel (alist-get 'text (car byline-runs)))
          (browse-endpoint (alist-get 'browseEndpoint
-                          (alist-get 'navigationEndpoint (car byline-runs))))
+				     (alist-get 'navigationEndpoint (car byline-runs))))
          (channel-id (alist-get 'canonicalBaseUrl browse-endpoint))
          (browse-id (alist-get 'browseId browse-endpoint))
          (thumbs (alist-get 'thumbnails (alist-get 'thumbnail renderer)))
@@ -66,8 +66,8 @@ Falls back to the predictable default.jpg URL pattern."
 (defun yeetube-scraper--row-text (row)
   "Extract the content string from a metadata ROW."
   (alist-get 'content
-   (alist-get 'text
-    (car (alist-get 'metadataParts row)))))
+	     (alist-get 'text
+			(car (alist-get 'metadataParts row)))))
 
 (defun yeetube-scraper--playlist-channel (metadata-rows)
   "Extract channel name from playlist METADATA-ROWS."
@@ -94,11 +94,11 @@ Falls back to the predictable default.jpg URL pattern."
 (defun yeetube-scraper--extract-playlist (renderer)
   "Extract a playlist plist from a lockupViewModel RENDERER alist."
   (let* ((meta (alist-get 'lockupMetadataViewModel
-               (alist-get 'metadata renderer)))
+			  (alist-get 'metadata renderer)))
          (title (alist-get 'content (alist-get 'title meta)))
          (rows (alist-get 'metadataRows
-                (alist-get 'contentMetadataViewModel
-                 (alist-get 'metadata meta))))
+			  (alist-get 'contentMetadataViewModel
+				     (alist-get 'metadata meta))))
          (channel (yeetube-scraper--playlist-channel rows))
          (video-count (yeetube-scraper--playlist-video-count rows))
          (thumb-url (yeetube-scraper--playlist-thumbnail renderer)))
@@ -137,10 +137,10 @@ Return plist (:token T :url U) or nil."
       (let* ((renderer (alist-get 'continuationItemRenderer cont-item))
              (endpoint (alist-get 'continuationEndpoint renderer))
              (token (alist-get 'token
-                    (alist-get 'continuationCommand endpoint)))
+			       (alist-get 'continuationCommand endpoint)))
              (url (alist-get 'apiUrl
-                   (alist-get 'webCommandMetadata
-                    (alist-get 'commandMetadata endpoint)))))
+			     (alist-get 'webCommandMetadata
+					(alist-get 'commandMetadata endpoint)))))
         (when token
           (list :token token :url (or url "")))))))
 
@@ -153,7 +153,7 @@ Return plist (:token T :url U) or nil."
            (lambda (s) (alist-get 'itemSectionRenderer s))
            sections))
          (items (alist-get 'contents
-                 (alist-get 'itemSectionRenderer item-section))))
+			   (alist-get 'itemSectionRenderer item-section))))
     (cl-loop for item in items
              for plist = (yeetube-scraper--dispatch-item item)
              when plist collect plist)))
@@ -162,8 +162,8 @@ Return plist (:token T :url U) or nil."
   "Extract item plists from channel page GRID-CONTENTS."
   (cl-loop for entry in grid-contents
            for renderer = (alist-get 'videoRenderer
-                           (alist-get 'content
-                            (alist-get 'richItemRenderer entry)))
+				     (alist-get 'content
+						(alist-get 'richItemRenderer entry)))
            when renderer
            collect (yeetube-scraper--extract-video renderer)))
 
@@ -173,9 +173,9 @@ Return plist (:token T :url U) or nil."
   "Parse search results from CONTENTS alist.
 Return plist (:items ITEMS :continuation CONT)."
   (let* ((primary (alist-get 'primaryContents
-                  (alist-get 'twoColumnSearchResultsRenderer contents)))
+			     (alist-get 'twoColumnSearchResultsRenderer contents)))
          (sections (alist-get 'contents
-                   (alist-get 'sectionListRenderer primary)))
+			      (alist-get 'sectionListRenderer primary)))
          (items (yeetube-scraper--extract-section-items sections))
          (continuation (yeetube-scraper--extract-continuation sections)))
     (list :items items :continuation continuation)))
@@ -184,17 +184,17 @@ Return plist (:items ITEMS :continuation CONT)."
   "Parse channel page from CONTENTS alist.
 Return plist (:items ITEMS :continuation CONT)."
   (let* ((tabs (alist-get 'tabs
-               (alist-get 'twoColumnBrowseResultsRenderer contents)))
+			  (alist-get 'twoColumnBrowseResultsRenderer contents)))
          (selected (cl-find-if
                     (lambda (tab)
                       (eq t (alist-get 'selected
-                             (alist-get 'tabRenderer tab))))
+				       (alist-get 'tabRenderer tab))))
                     tabs))
          (grid-contents
           (alist-get 'contents
-           (alist-get 'richGridRenderer
-            (alist-get 'content
-             (alist-get 'tabRenderer selected)))))
+		     (alist-get 'richGridRenderer
+				(alist-get 'content
+					   (alist-get 'tabRenderer selected)))))
          (items (yeetube-scraper--extract-grid-items grid-contents))
          (continuation (yeetube-scraper--extract-continuation grid-contents)))
     (list :items items :continuation continuation)))

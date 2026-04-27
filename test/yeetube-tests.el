@@ -57,7 +57,7 @@
 (ert-deftest yeetube-test-find-item ()
   "Find item plist by ID."
   (let ((yeetube-items '((:id "abc" :title "First" :type video)
-                          (:id "def" :title "Second" :type video))))
+                         (:id "def" :title "Second" :type video))))
     (should (equal "First" (plist-get (yeetube--find-item "abc") :title)))
     (should (equal "Second" (plist-get (yeetube--find-item "def") :title)))
     (should-not (yeetube--find-item "nonexistent"))))

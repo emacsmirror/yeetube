@@ -120,8 +120,8 @@ is accumulated entries (reversed), GROUPS is current row's groups
     (cond
      ((null rest)
       (reverse (if flush-group
-                    (cons (reverse flush-group) rows)
-                  rows)))
+                   (cons (reverse flush-group) rows)
+                 rows)))
      ((eq (car rest) :row)
       (keymap-popup--split-groups-1
        (cdr rest) nil nil nil
@@ -213,9 +213,9 @@ MAP-NAME is used to derive generated command names."
                      (plist-get entry :description)))
          (type-props (pcase type
                        ('suffix `(:command ,(keymap-popup--quote-if-needed
-                                            (plist-get entry :command))
-                                 ,@(when (plist-get entry :stay-open)
-                                     '(:stay-open t))))
+                                             (plist-get entry :command))
+					   ,@(when (plist-get entry :stay-open)
+					       '(:stay-open t))))
                        ('keymap `(:target ',(plist-get entry :target)))
                        (_ `(:variable ',(plist-get entry :variable)))))
          (if-pred (plist-get entry :if))
@@ -239,7 +239,7 @@ Uses list calls so lambdas get compiled."
                         (lambda (group)
                           `(list :name ,(plist-get group :name)
                                  :entries (list ,@(mapcar #'keymap-popup--build-entry-form
-                                                         (plist-get group :entries)))))
+                                                          (plist-get group :entries)))))
                         row)))
             rows)))
 
@@ -456,8 +456,8 @@ Shorter columns are padded with blank lines."
          (padded-cols (cl-mapcar
                        (lambda (col width)
                          (let ((padded (mapcar (lambda (line)
-                                                (keymap-popup--pad-line line width))
-                                              col))
+                                                 (keymap-popup--pad-line line width))
+                                               col))
                                (blanks (make-list (- max-height (length col))
                                                   (make-string width ?\s))))
                            (append padded blanks)))
@@ -500,9 +500,9 @@ Column widths are aligned across all rows."
          (sections (cl-loop for cols in rendered-rows
                             when cols
                             collect (mapconcat #'identity
-                                              (keymap-popup--join-columns
-                                               cols "   " col-widths)
-                                              "\n"))))
+                                               (keymap-popup--join-columns
+						cols "   " col-widths)
+                                               "\n"))))
     (concat doc (mapconcat #'identity sections "\n") "\n")))
 
 ;;; Popup display

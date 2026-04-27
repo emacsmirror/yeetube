@@ -138,8 +138,8 @@ The vector layout depends on `yeetube-display-thumbnails-p'."
          (fields (list title-str views-str duration-str
                        date-str channel-str channel-id type)))
     (list id (if yeetube-display-thumbnails-p
-                (apply #'vector (format "[[%s.jpg]]" id) fields)
-              (apply #'vector fields)))))
+                 (apply #'vector (format "[[%s.jpg]]" id) fields)
+               (apply #'vector fields)))))
 
 
 ;;; Sort helpers
@@ -278,11 +278,11 @@ Each element in ITEMS is a plist with at least :id and :thumbnail-url."
             (if yeetube-enable-tor
                 (yeetube-with-tor-socks
                  (url-queue-retrieve url #'yeetube-ui--image-callback
-                                    (list id buffer)
-                                    'silent 'inhibit-cookies))
+                                     (list id buffer)
+                                     'silent 'inhibit-cookies))
               (url-queue-retrieve url #'yeetube-ui--image-callback
-                                 (list id buffer)
-                                 'silent 'inhibit-cookies))))))))
+                                  (list id buffer)
+                                  'silent 'inhibit-cookies))))))))
 
 (provide 'yeetube-ui)
 ;;; yeetube-ui.el ends here

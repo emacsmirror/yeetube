@@ -20,7 +20,7 @@
 (defun yeetube-scraper-test--load-fixture (name)
   "Load JSON fixture NAME from test/fixtures/ directory."
   (let ((path (expand-file-name (concat "fixtures/" name)
-               yeetube-scraper-test--dir)))
+				yeetube-scraper-test--dir)))
     (with-temp-buffer
       (insert-file-contents path)
       (json-parse-buffer :object-type 'alist :array-type 'list))))
@@ -184,10 +184,10 @@ Uses vectors for JSON arrays, alists for objects."
 (defun yeetube-scraper-test--make-continuation (token url)
   "Build a continuationItemRenderer alist with TOKEN and URL."
   `((continuationItemRenderer
-    . ((continuationEndpoint
-        . ((continuationCommand . ((token . ,token)))
-           (commandMetadata
-            . ((webCommandMetadata . ((apiUrl . ,url)))))))))))
+     . ((continuationEndpoint
+         . ((continuationCommand . ((token . ,token)))
+            (commandMetadata
+             . ((webCommandMetadata . ((apiUrl . ,url)))))))))))
 
 (defun yeetube-scraper-test--make-playlist-lockup (id title channel video-count thumb-url)
   "Build a lockupViewModel playlist alist.
