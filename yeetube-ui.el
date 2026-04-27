@@ -35,7 +35,7 @@
 (defvar yeetube-content)
 
 ;; Forward declarations -- functions from yeetube.el
-(declare-function yeetube-with-tor-socks "yeetube")
+(declare-function yeetube-with-tor-socks "yeetube" (&rest body))
 
 
 ;;; Faces

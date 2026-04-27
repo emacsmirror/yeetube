@@ -54,9 +54,9 @@
 (defun yeetube-scraper--thumbnail-url (video-id thumbnails)
   "Build a small thumbnail URL for VIDEO-ID from THUMBNAILS list.
 Falls back to the predictable default.jpg URL pattern."
-  (or (when-let* ((url (alist-get 'url (car thumbnails)))
-                  (qmark (string-search "?" url))
-                  (base (substring url 0 qmark)))
+  (or (and-let* ((url (alist-get 'url (car thumbnails)))
+                 (qmark (string-search "?" url))
+                 (base (substring url 0 qmark)))
         ;; Use the smaller "default" variant instead of hq720
         (string-replace "hq720" "default" base))
       (format "https://i.ytimg.com/vi/%s/default.jpg" video-id)))
@@ -77,7 +77,7 @@ Falls back to the predictable default.jpg URL pattern."
   "Extract video count string from playlist METADATA-ROWS."
   (when-let* ((found (cl-find-if
                       (lambda (row)
-                        (when-let* ((text (yeetube-scraper--row-text row)))
+                        (and-let* ((text (yeetube-scraper--row-text row)))
                           (string-match-p "video" text)))
                       metadata-rows)))
     (yeetube-scraper--row-text found)))
@@ -120,7 +120,7 @@ Falls back to the predictable default.jpg URL pattern."
    ((alist-get 'videoRenderer item)
     (yeetube-scraper--extract-video (alist-get 'videoRenderer item)))
    ;; YouTube migrated playlists from playlistRenderer to lockupViewModel
-   ((when-let* ((lockup (alist-get 'lockupViewModel item)))
+   ((and-let* ((lockup (alist-get 'lockupViewModel item)))
       (equal (alist-get 'contentType lockup) "LOCKUP_CONTENT_TYPE_PLAYLIST"))
     (yeetube-scraper--extract-playlist (alist-get 'lockupViewModel item)))))
 

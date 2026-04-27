@@ -58,23 +58,19 @@
 
 (defcustom yeetube-torsocks-program (executable-find "torsocks")
   "Path for torsocks executable."
-  :type 'string
-  :group 'yeetube)
+  :type 'string)
 
 (defcustom yeetube-ytdlp-program (executable-find "yt-dlp")
   "Path for yt-dlp executable."
-  :type 'string
-  :group 'yeetube)
+  :type 'string)
 
 (defcustom yeetube-results-limit 20
   "Define a limit for search results."
-  :type 'number
-  :group 'yeetube)
+  :type 'natnum)
 
 (defcustom yeetube-play-function #'yeetube-mpv-play
   "Select media player function."
-  :type 'function
-  :group 'yeetube)
+  :type 'function)
 
 (defcustom yeetube-download-audio-format nil
   "Download videos as specified audio only formats."
@@ -86,13 +82,11 @@
 		(const :tag "MP3" "mp3")
 		(const :tag "OPUS" "opus")
 		(const :tag "Vorbis" "vorbis")
-		(const :tag "WAV" "wav"))
-  :group 'yeetube)
+		(const :tag "WAV" "wav")))
 
 (defcustom yeetube-download-directory (or (xdg-user-dir "DOWNLOAD") (getenv "HOME"))
   "Default directory to download videos."
-  :type 'string
-  :group 'yeetube)
+  :type 'string)
 
 (defcustom yeetube-filter "Relevance"
   "Sort search results for value.
@@ -104,8 +98,7 @@ Valid options include:
   :type '(radio (const "Relevance")
 		(const "Date")
 		(const "Views")
-		(const "Rating"))
-  :group 'yeetube)
+		(const "Rating")))
 
 (defcustom yeetube-default-sort-column nil
   "Column to sort the search results table."
@@ -113,38 +106,31 @@ Valid options include:
 		(const "Title")
                 (const "Views")
                 (const "Duration")
-                (const "Channel"))
-  :group 'yeetube)
+                (const "Channel")))
 
 (defcustom yeetube-default-sort-ascending nil
   "Whether to sort the search results in ascending order."
-  :type 'boolean
-  :group 'yeetube)
+  :type 'boolean)
 
 (defcustom yeetube-enable-tor nil
   "Enable routing through tor."
-  :type 'boolean
-  :group 'yeetube)
+  :type 'boolean)
 
 (defcustom yeetube-enable-emojis t
   "Enable emojis in *yeetube* buffer."
-  :type 'boolean
-  :group 'yeetube)
+  :type 'boolean)
 
 (defcustom yeetube-pop-to-same-window-p t
   "When non-nil, create *yeetube* buffer at the same window."
-  :type 'boolean
-  :group 'yeetube)
+  :type 'boolean)
 
 (defcustom yeetube-thumbnail-size '(120 . 90)
   "Thumbnail size (width . height)."
-  :type '(cons integer integer)
-  :group 'yeetube)
+  :type '(cons integer integer))
 
 (defcustom yeetube-display-thumbnails-p t
   "When non-nil, fetch & display thumbnails."
-  :type 'boolean
-  :group 'yeetube)
+  :type 'boolean)
 
 (defvar yeetube-invidious-instances
   '("vid.puffyan.us" "inv.nadeko.net" "invidious.flokinet.to")
@@ -376,15 +362,14 @@ If ARG is non-nil, save as a playlist URL."
   (interactive)
   (yeetube-load-saved-videos)
   (let ((video (completing-read "Select video: " yeetube-saved-videos nil t)))
-    (setf yeetube-saved-videos (remove (assoc video yeetube-saved-videos) yeetube-saved-videos))))
+    (setf yeetube-saved-videos (remq (assoc video yeetube-saved-videos) yeetube-saved-videos))))
 
 ;;;###autoload
 (defun yeetube-remove-all-saved-videos ()
   "Clear all saved videos from yeetube."
   (interactive)
-  (let ((clear-saved (y-or-n-p "Delete saved?")))
-    (when clear-saved
-      (setf yeetube-saved-videos nil))))
+  (when (y-or-n-p "Delete saved?")
+    (setf yeetube-saved-videos nil)))
 
 (defun yeetube-update-saved-videos-list (_symbol new-value _where _environment)
   "Update saved videos list file.
@@ -450,7 +435,7 @@ Optionally, provide custom own URL."
               (setq-local yeetube--results-limit limit)
               (yeetube-ui-render items)
               (yeetube-ui-fetch-thumbnails items "*yeetube*")
-              (when (and continuation (< (length items) limit))
+              (when (and continuation (length< items limit))
                 (yeetube--auto-paginate limit)))))
       (kill-buffer url-buffer))))
 
@@ -486,7 +471,7 @@ Optionally, provide custom own URL."
 (defun yeetube--auto-paginate (limit)
   "Automatically fetch next page if current items are below LIMIT."
   (when (and yeetube--continuation
-             (< (length yeetube-items) limit))
+             (length< yeetube-items limit))
     (yeetube-next-page)))
 
 (defun yeetube-next-page ()
@@ -535,8 +520,8 @@ Optionally, provide custom own URL."
                 (yeetube-ui-append items)
                 (yeetube-ui-fetch-thumbnails items "*yeetube*")
                 (when (and continuation
-                           (< (length yeetube-items)
-                              (or yeetube--results-limit yeetube-results-limit)))
+                           (length< yeetube-items
+                                    (or yeetube--results-limit yeetube-results-limit)))
                   (yeetube--auto-paginate
                    (or yeetube--results-limit yeetube-results-limit)))))))
       (kill-buffer url-buffer))))
