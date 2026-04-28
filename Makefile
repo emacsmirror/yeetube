@@ -8,7 +8,7 @@ GUIX_SHELL ?= guix shell -m manifest.scm --
 
 BATCH = $(GUIX_SHELL) $(EMACS) -Q --batch -L .
 
-SRCS = keymap-popup.el yeetube-scraper.el yeetube-ui.el \
+SRCS = yeetube-scraper.el yeetube-ui.el \
        yeetube-download.el yeetube-mpv.el yeetube.el yeetube-ol.el
 
 TESTS = test/yeetube-scraper-tests.el test/yeetube-ui-tests.el \
