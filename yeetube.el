@@ -655,8 +655,10 @@ Optionally, provide custom own URL."
   (display-line-numbers-mode 0))
 
 ;;;###autoload
-(defalias 'yeetube (lambda () (interactive)
-                     (keymap-popup yeetube-mode-map)))
+(defun yeetube ()
+  "YeeTube entrypoint."
+  (interactive)
+  (keymap-popup yeetube-mode-map))
 
 (provide 'yeetube)
 ;;; yeetube.el ends here
