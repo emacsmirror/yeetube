@@ -625,17 +625,25 @@ Optionally, provide custom own URL."
   "V"   ("No video" :switch yeetube-mpv-no-video :if (lambda () yeetube--show-settings))
   "T"   ("Torsocks" :switch yeetube-mpv-enable-torsocks :if (lambda () yeetube--show-settings))
   "n"   ((lambda () (format "Results limit =%s" yeetube--results-limit))
-         yeetube-set-results-limit
-         :stay-open t :if (lambda () yeetube--show-settings))
+         (lambda () (interactive)
+           (call-interactively #'yeetube-set-results-limit)
+           (keymap-popup yeetube-mode-map))
+         :if (lambda () yeetube--show-settings))
   "Q"   ((lambda () (format "Video quality =%s" yeetube-mpv-video-quality))
-         yeetube-set-video-quality
-         :stay-open t :if (lambda () yeetube--show-settings))
+         (lambda () (interactive)
+           (call-interactively #'yeetube-set-video-quality)
+           (keymap-popup yeetube-mode-map))
+         :if (lambda () yeetube--show-settings))
   "D"   ((lambda () (format "Download dir =%s" yeetube--download-directory))
-         yeetube-set-download-directory
-         :stay-open t :if (lambda () yeetube--show-settings))
+         (lambda () (interactive)
+           (call-interactively #'yeetube-set-download-directory)
+           (keymap-popup yeetube-mode-map))
+         :if (lambda () yeetube--show-settings))
   "a"   ((lambda () (format "Audio format =%s" (or yeetube--audio-format "none")))
-         yeetube-set-audio-format
-         :stay-open t :if (lambda () yeetube--show-settings)))
+         (lambda () (interactive)
+           (call-interactively #'yeetube-set-audio-format)
+           (keymap-popup yeetube-mode-map))
+         :if (lambda () yeetube--show-settings)))
 
 (define-derived-mode yeetube-mode tabulated-list-mode "Yeetube"
   "Yeetube mode."
