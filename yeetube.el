@@ -5,7 +5,7 @@
 ;; Author: Thanos Apollo <public@thanosapollo.org>
 ;; Keywords: extensions youtube videos
 ;; URL: https://thanosapollo.org/projects/yeetube/
-;; Version: 2.2.0
+;; Version: 2.3.0
 
 ;; Package-Requires: ((emacs "29.1") (compat "29.1.4.2") (keymap-popup "0.2.0"))
 
