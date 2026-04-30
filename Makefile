@@ -1,36 +1,50 @@
 .POSIX:
 
-EMACS ?= emacs
+ifndef EMACS_CMD
+GUIX := $(shell command -v guix 2>/dev/null)
+ifdef GUIX
+GUIX_SHELL := guix shell --pure -D -f guix.scm emacs-next --
+EMACS_CMD := $(GUIX_SHELL) emacs
+else
+GUIX_SHELL :=
+EMACS_CMD := emacs
+endif
+endif
 
-# Comment out or override to skip Guix:
-#   make GUIX_SHELL= test
-GUIX_SHELL ?= guix shell -m manifest.scm --
+GUIX_WRAP = $(if $(GUIX_SHELL),$(GUIX_SHELL) $(MAKE) --no-print-directory EMACS_CMD=emacs,$(MAKE) --no-print-directory)
 
-BATCH = $(GUIX_SHELL) $(EMACS) -Q --batch -L .
+SRCS = yeetube.el yeetube-mpv.el yeetube-ol.el
 
-SRCS = yeetube-scraper.el yeetube-ui.el \
-       yeetube-download.el yeetube-mpv.el yeetube.el yeetube-ol.el
+TESTS = test/yeetube-tests.el
 
-TESTS = test/yeetube-scraper-tests.el test/yeetube-ui-tests.el \
-        test/yeetube-tests.el
+BATCH = $(EMACS_CMD) -Q --batch -L .
 
-.PHONY: all compile test lint clean dev load
+.PHONY: all compile do-compile test do-test lint do-lint clean dev load
 
 all: compile
 
 compile:
+	@$(GUIX_WRAP) do-compile
+
+do-compile:
 	@for f in $(SRCS); do \
 	  echo "Compiling $$f..."; \
 	  $(BATCH) -l $$f -f batch-byte-compile $$f || exit 1; \
 	done
 
 test:
+	@$(GUIX_WRAP) do-test
+
+do-test:
 	@for f in $(TESTS); do \
 	  echo "Testing $$f..."; \
 	  $(BATCH) -l ert -l $$f -f ert-run-tests-batch-and-exit || exit 1; \
 	done
 
 lint:
+	@$(GUIX_WRAP) do-lint
+
+do-lint:
 	@echo "Running checkdoc..."
 	@for f in $(SRCS); do \
 	  $(BATCH) --eval "(checkdoc-file \"$$f\")" || exit 1; \
