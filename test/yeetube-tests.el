@@ -95,28 +95,23 @@
       (when (process-live-p proc)
         (delete-process proc)))))
 
-;;; Group 6: yeetube-update-saved-videos-list round-trip (regression)
+;;; Group 6: yeetube-save-saved-videos round-trip (regression)
 
-(ert-deftest yeetube-test-update-saved-videos-round-trip ()
+(ert-deftest yeetube-test-save-saved-videos-round-trip ()
   "Saved videos can be written and read back."
-  ;; Remove the variable watcher to prevent triggers during let unwind
-  (remove-variable-watcher 'yeetube-saved-videos #'yeetube-update-saved-videos-list)
-  (unwind-protect
-      (let* ((temp-dir (make-temp-file "yeetube-test" t))
-             (user-emacs-directory (file-name-as-directory temp-dir))
-             (yeetube-saved-videos nil)
-             (test-data '(("Video One" . "https://youtube.com/watch?v=abc")
-                          ("Video Two" . "https://youtube.com/watch?v=def"))))
-        (unwind-protect
-            (progn
-              ;; Write via the watcher function
-              (yeetube-update-saved-videos-list 'yeetube-saved-videos test-data nil nil)
-              ;; Read back
-              (setf yeetube-saved-videos nil)
-              (yeetube-load-saved-videos)
-              (should (equal test-data yeetube-saved-videos)))
-          (delete-directory temp-dir t)))
-    (add-variable-watcher 'yeetube-saved-videos #'yeetube-update-saved-videos-list)))
+  (let* ((temp-dir (make-temp-file "yeetube-test" t))
+         (user-emacs-directory (file-name-as-directory temp-dir))
+         (yeetube-saved-videos '(("Video One" . "https://youtube.com/watch?v=abc")
+                                 ("Video Two" . "https://youtube.com/watch?v=def"))))
+    (unwind-protect
+        (progn
+          (yeetube-save-saved-videos)
+          (setf yeetube-saved-videos nil)
+          (yeetube-load-saved-videos)
+          (should (equal '(("Video One" . "https://youtube.com/watch?v=abc")
+                           ("Video Two" . "https://youtube.com/watch?v=def"))
+                         yeetube-saved-videos)))
+      (delete-directory temp-dir t))))
 
 ;;; Group 7: yeetube-mode-map keybindings
 

@@ -347,7 +347,8 @@ If ARG is non-nil, save as a playlist URL."
   (yeetube-load-saved-videos)
   (let ((name (read-string "Save as: "))
 	(url (yeetube-get-url (tabulated-list-get-id) (if arg 'playlist 'video))))
-    (push (cons name url) yeetube-saved-videos)))
+    (push (cons name url) yeetube-saved-videos)
+    (yeetube-save-saved-videos)))
 
 ;; We could use keywords here, but it would break users saved videos
 ;; from previous versions.
@@ -368,28 +369,23 @@ If ARG is non-nil, save as a playlist URL."
   (interactive)
   (yeetube-load-saved-videos)
   (let ((video (completing-read "Select video: " yeetube-saved-videos nil t)))
-    (setf yeetube-saved-videos (remq (assoc video yeetube-saved-videos) yeetube-saved-videos))))
+    (setf yeetube-saved-videos (remq (assoc video yeetube-saved-videos) yeetube-saved-videos))
+    (yeetube-save-saved-videos)))
 
 ;;;###autoload
 (defun yeetube-remove-all-saved-videos ()
   "Clear all saved videos from yeetube."
   (interactive)
   (when (y-or-n-p "Delete saved?")
-    (setf yeetube-saved-videos nil)))
+    (setf yeetube-saved-videos nil)
+    (yeetube-save-saved-videos)))
 
-(defun yeetube-update-saved-videos-list (_symbol new-value _where _environment)
-  "Update saved videos list file.
-
-This is a variable watcher function that writes NEW-VALUE to the saved
-videos file whenever `yeetube-saved-videos' changes.  _SYMBOL is the
-variable being watched, _WHERE indicates the type of change, and
-_ENVIRONMENT is the lexical environment."
+(defun yeetube-save-saved-videos ()
+  "Write `yeetube-saved-videos' to disk."
   (let ((file-path (concat user-emacs-directory "yeetube")))
     (with-temp-buffer
-      (insert (pp-to-string new-value))
+      (insert (pp-to-string yeetube-saved-videos))
       (write-region (point-min) (point-max) file-path))))
-
-(add-variable-watcher 'yeetube-saved-videos #'yeetube-update-saved-videos-list)
 
 
 ;;; Download
