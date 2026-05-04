@@ -620,22 +620,32 @@ Optionally, provide custom own URL."
          :inapt-if (lambda () (not (get-process yeetube-mpv--process-name))))
   "V"   ("No video" :switch yeetube-mpv-no-video :if (lambda () yeetube--show-settings))
   "T"   ("Torsocks" :switch yeetube-mpv-enable-torsocks :if (lambda () yeetube--show-settings))
-  "n"   ((lambda () (format "Results limit =%s" yeetube--results-limit))
+  "n"   ((lambda () (format "Results limit: %s"
+                            (propertize (format "%s" (or yeetube--results-limit
+                                                         yeetube-results-limit))
+					'face 'font-lock-constant-face)))
          (lambda () (interactive)
            (call-interactively #'yeetube-set-results-limit)
            (keymap-popup yeetube-mode-map))
          :if (lambda () yeetube--show-settings))
-  "Q"   ((lambda () (format "Video quality =%s" yeetube-mpv-video-quality))
+  "Q"   ((lambda () (format "Video quality: %s"
+                            (propertize (or yeetube-mpv-video-quality "default")
+					'face 'font-lock-constant-face)))
          (lambda () (interactive)
            (call-interactively #'yeetube-set-video-quality)
            (keymap-popup yeetube-mode-map))
          :if (lambda () yeetube--show-settings))
-  "D"   ((lambda () (format "Download dir =%s" yeetube--download-directory))
+  "D"   ((lambda () (format "Download dir: %s"
+                            (propertize (or yeetube--download-directory
+                                            yeetube-download-directory)
+					'face 'font-lock-constant-face)))
          (lambda () (interactive)
            (call-interactively #'yeetube-set-download-directory)
            (keymap-popup yeetube-mode-map))
          :if (lambda () yeetube--show-settings))
-  "a"   ((lambda () (format "Audio format =%s" (or yeetube--audio-format "none")))
+  "a"   ((lambda () (format "Audio format: %s"
+                            (propertize (or yeetube--audio-format "none")
+					'face 'font-lock-constant-face)))
          (lambda () (interactive)
            (call-interactively #'yeetube-set-audio-format)
            (keymap-popup yeetube-mode-map))
