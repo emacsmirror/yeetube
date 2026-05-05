@@ -595,6 +595,7 @@ Optionally, provide custom own URL."
 
 (keymap-popup-define yeetube-mode-map
   "Yeetube Mode Map"
+  :description "Yeetube Menu"
   :group "Play"
   "RET" ("Play" yeetube-play)
   "r"   ("Replay" yeetube-replay)
