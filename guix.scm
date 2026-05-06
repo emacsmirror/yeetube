@@ -48,30 +48,6 @@ artifacts."
              (string-suffix? "-autoloads.el" file)
              (string-suffix? "-pkg.el" file)))))
 
-(define-public emacs-keymap-popup
-  (let ((commit "fec80af2cdf9e3a25bb5033b32bf873584778f05")
-        (revision "0"))
-    (package
-     (name "emacs-keymap-popup")
-     (version (git-version "0.2.0" revision commit))
-     (source (origin
-              (method git-fetch)
-              (uri (git-reference
-                    (url "https://codeberg.org/thanosapollo/emacs-keymap-popup")
-                    (commit commit)))
-              (file-name (git-file-name name version))
-              (sha256
-               (base32
-                "0x9vq4hnp7famcfv72qq6f28faang58gvr8ah223iqsvphrc5bz6"))))
-     (build-system emacs-build-system)
-     (arguments (list #:tests? #f))
-     (home-page "https://codeberg.org/thanosapollo/emacs-keymap-popup")
-     (synopsis "Described keymaps with popup help")
-     (description
-      "Produces a real Emacs keymap with embedded descriptions for a popup
-help window.  One definition, two uses.")
-     (license license:gpl3+))))
-
 (define-public emacs-yeetube-git
   (package
    (name "emacs-yeetube-git")
