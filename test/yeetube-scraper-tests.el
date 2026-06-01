@@ -152,6 +152,61 @@
   (let ((item '((adSlot (something . "ad data")))))
     (should-not (yeetube-scraper--dispatch-item item))))
 
+(defun yeetube-scraper-test--make-video-lockup (id title views date duration)
+  "Build a VIDEO lockupViewModel alist with the given fields."
+  `((lockupViewModel
+     (contentId . ,id)
+     (contentType . "LOCKUP_CONTENT_TYPE_VIDEO")
+     (metadata
+      (lockupMetadataViewModel
+       (title (content . ,title))
+       (metadata
+        (contentMetadataViewModel
+         (metadataRows
+          ((metadataParts ((text (content . ,views)))
+                          ((text (content . ,date))))))))))
+     (contentImage
+      (thumbnailViewModel
+       (image (sources ((url . ,(format "https://i.ytimg.com/vi/%s/hqdefault.jpg?sqp=x" id))
+                        (width . 168) (height . 94))))
+       (overlays
+        ((thumbnailBottomOverlayViewModel
+          (badges ((thumbnailBadgeViewModel (text . ,duration))))))))))))
+
+(ert-deftest yeetube-scraper-test-dispatch-video-lockup ()
+  "Dispatch routes VIDEO lockupViewModel to extract-video-lockup."
+  (let* ((item (yeetube-scraper-test--make-video-lockup
+                "vidLockup1" "Lockup Video" "1.2K views" "2 weeks ago" "12:34"))
+         (result (yeetube-scraper--dispatch-item item)))
+    (should (equal "vidLockup1" (plist-get result :id)))
+    (should (equal "Lockup Video" (plist-get result :title)))
+    (should (equal "1.2K views" (plist-get result :views)))
+    (should (equal "12:34" (plist-get result :duration)))
+    (should (equal "2 weeks ago" (plist-get result :date)))
+    (should (equal "https://i.ytimg.com/vi/vidLockup1/default.jpg"
+                   (plist-get result :thumbnail-url)))
+    (should (eq 'video (plist-get result :type)))))
+
+(ert-deftest yeetube-scraper-test-extract-grid-items-handles-lockup ()
+  "Grid items are extracted from lockupViewModel-wrapped richItemRenderer."
+  (let* ((lockup (yeetube-scraper-test--make-video-lockup
+                  "gridLockup" "Grid Video" "500 views" "3 days ago" "5:00"))
+         (grid-entry `((richItemRenderer (content . ,lockup))))
+         (items (yeetube-scraper--extract-grid-items (list grid-entry))))
+    (should (= 1 (length items)))
+    (should (equal "gridLockup" (plist-get (car items) :id)))
+    (should (equal "Grid Video" (plist-get (car items) :title)))
+    (should (equal "5:00" (plist-get (car items) :duration)))))
+
+(ert-deftest yeetube-scraper-test-lockup-views-and-date-handles-swapped-order ()
+  "views/date detection works regardless of metadataParts order."
+  (let ((parts1 '(((text (content . "999 views"))) ((text (content . "1 month ago")))))
+        (parts2 '(((text (content . "1 month ago"))) ((text (content . "999 views"))))))
+    (should (equal '("999 views" . "1 month ago")
+                   (yeetube-scraper--lockup-views-and-date parts1)))
+    (should (equal '("999 views" . "1 month ago")
+                   (yeetube-scraper--lockup-views-and-date parts2)))))
+
 ;;; Group 4: continuation token extraction
 
 (ert-deftest yeetube-scraper-test-extract-continuation ()

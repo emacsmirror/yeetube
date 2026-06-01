@@ -22,6 +22,7 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'subr-x)
 
 (defun yeetube-scraper--extract-video (renderer)
   "Extract a video plist from a videoRenderer RENDERER alist."
@@ -53,13 +54,90 @@
 
 (defun yeetube-scraper--thumbnail-url (video-id thumbnails)
   "Build a small thumbnail URL for VIDEO-ID from THUMBNAILS list.
-Falls back to the predictable default.jpg URL pattern."
+Falls back to the predictable default.jpg URL pattern.
+Normalises any hq720 / hqdefault / mqdefault / sddefault /
+maxresdefault variant to default.jpg so the tabulated UI fetches
+the smallest image."
   (or (and-let* ((url (alist-get 'url (car thumbnails)))
                  (qmark (string-search "?" url))
                  (base (substring url 0 qmark)))
-        ;; Use the smaller "default" variant instead of hq720
-        (string-replace "hq720" "default" base))
+        (replace-regexp-in-string
+         "/\\(hq720\\|hqdefault\\|mqdefault\\|sddefault\\|maxresdefault\\)\\.jpg\\'"
+         "/default.jpg" base))
       (format "https://i.ytimg.com/vi/%s/default.jpg" video-id)))
+
+;;; lockupViewModel helpers (shared by video and playlist extraction)
+
+(defun yeetube-scraper--lockup-metadata-parts (renderer)
+  "Return metadataParts list from the first row of a lockupViewModel RENDERER."
+  (let* ((meta (alist-get 'lockupMetadataViewModel
+                          (alist-get 'metadata renderer)))
+         (cmvm (alist-get 'contentMetadataViewModel
+                          (alist-get 'metadata meta)))
+         (rows (alist-get 'metadataRows cmvm)))
+    (alist-get 'metadataParts (car rows))))
+
+(defun yeetube-scraper--lockup-part-text (part)
+  "Return the text content from a single metadataParts PART, or nil."
+  (alist-get 'content (alist-get 'text part)))
+
+(defun yeetube-scraper--lockup-views-and-date (parts)
+  "Return cons (VIEWS . DATE) extracted from PARTS list.
+The part whose text contains \"view\" is the view count; the
+remaining part is the published date.  Returns empty strings for
+absent fields."
+  (let (views date)
+    (dolist (part parts)
+      (let ((text (yeetube-scraper--lockup-part-text part)))
+        (cond ((null text))
+              ((string-match-p "view" text) (setq views text))
+              (t (setq date (or date text))))))
+    (cons (or views "") (or date ""))))
+
+(defun yeetube-scraper--lockup-duration (renderer)
+  "Return duration string from RENDERER's bottom-overlay badge, or nil."
+  (let ((overlays (alist-get 'overlays
+                             (alist-get 'thumbnailViewModel
+                                        (alist-get 'contentImage renderer)))))
+    (cl-some (lambda (ov)
+               (when-let* ((bot (alist-get 'thumbnailBottomOverlayViewModel ov))
+                           (badge (car (alist-get 'badges bot)))
+                           (text (alist-get 'text
+                                            (alist-get 'thumbnailBadgeViewModel
+                                                       badge))))
+                 text))
+             overlays)))
+
+(defun yeetube-scraper--lockup-thumbnails (renderer)
+  "Return thumbnail sources list from a lockupViewModel RENDERER."
+  (alist-get 'sources
+             (alist-get 'image
+                        (alist-get 'thumbnailViewModel
+                                   (alist-get 'contentImage renderer)))))
+
+(defun yeetube-scraper--extract-video-lockup (renderer)
+  "Extract a video plist from a VIDEO-type lockupViewModel RENDERER alist.
+YouTube migrated channel-tab video rows from videoRenderer to this
+lockup shape in 2025."
+  (let* ((id (alist-get 'contentId renderer))
+         (title (alist-get 'content
+                           (alist-get 'title
+                                      (alist-get 'lockupMetadataViewModel
+                                                 (alist-get 'metadata renderer)))))
+         (parts (yeetube-scraper--lockup-metadata-parts renderer))
+         (vd (yeetube-scraper--lockup-views-and-date parts))
+         (thumb-url (yeetube-scraper--thumbnail-url
+                     id (yeetube-scraper--lockup-thumbnails renderer))))
+    (list :id id
+          :title (or title "")
+          :views (car vd)
+          :duration (or (yeetube-scraper--lockup-duration renderer) "")
+          :date (cdr vd)
+          :channel ""
+          :channel-id ""
+          :browse-id ""
+          :thumbnail-url (or thumb-url "")
+          :type 'video)))
 
 ;;; Playlist extraction (lockupViewModel)
 
@@ -119,10 +197,15 @@ Falls back to the predictable default.jpg URL pattern."
   (cond
    ((alist-get 'videoRenderer item)
     (yeetube-scraper--extract-video (alist-get 'videoRenderer item)))
-   ;; YouTube migrated playlists from playlistRenderer to lockupViewModel
-   ((and-let* ((lockup (alist-get 'lockupViewModel item)))
-      (equal (alist-get 'contentType lockup) "LOCKUP_CONTENT_TYPE_PLAYLIST"))
-    (yeetube-scraper--extract-playlist (alist-get 'lockupViewModel item)))))
+   ;; YouTube migrated playlists, and later channel-tab video rows, to
+   ;; lockupViewModel.  Branch on contentType.
+   ((alist-get 'lockupViewModel item)
+    (let ((lockup (alist-get 'lockupViewModel item)))
+      (pcase (alist-get 'contentType lockup)
+        ("LOCKUP_CONTENT_TYPE_PLAYLIST"
+         (yeetube-scraper--extract-playlist lockup))
+        ("LOCKUP_CONTENT_TYPE_VIDEO"
+         (yeetube-scraper--extract-video-lockup lockup)))))))
 
 ;;; Continuation token extraction
 
@@ -159,13 +242,15 @@ Return plist (:token T :url U) or nil."
              when plist collect plist)))
 
 (defun yeetube-scraper--extract-grid-items (grid-contents)
-  "Extract item plists from channel page GRID-CONTENTS."
+  "Extract item plists from channel page GRID-CONTENTS.
+Each grid entry is wrapped in a `richItemRenderer'; the inner
+`content' is then either a videoRenderer (legacy) or a
+lockupViewModel (current YouTube layout), so dispatch through
+`yeetube-scraper--dispatch-item' to handle both."
   (cl-loop for entry in grid-contents
-           for renderer = (alist-get 'videoRenderer
-				     (alist-get 'content
-						(alist-get 'richItemRenderer entry)))
-           when renderer
-           collect (yeetube-scraper--extract-video renderer)))
+           for inner = (alist-get 'content (alist-get 'richItemRenderer entry))
+           for plist = (and inner (yeetube-scraper--dispatch-item inner))
+           when plist collect plist))
 
 ;;; Page-type parsers
 
