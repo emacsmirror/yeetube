@@ -513,40 +513,51 @@ does the same rewrite for the same reason)."
          (entries (and feed (dom-by-tag feed 'entry))))
     (delq nil (mapcar #'yeetube--rss-entry-item entries))))
 
-(defun yeetube--rss-fallback (fallback-url)
-  "Display FALLBACK-URL with the regular scraper when non-nil."
-  (when fallback-url
-    (yeetube-display-content-from-url fallback-url)))
+(defun yeetube--render-items (items limit &optional continuation)
+  "Render ITEMS into the *yeetube* buffer with LIMIT and CONTINUATION.
+Pops to the buffer per `yeetube-pop-to-same-window-p', resets the
+major mode, populates state, and kicks off thumbnail fetching."
+  (let ((pop-fn (if yeetube-pop-to-same-window-p
+                    #'pop-to-buffer-same-window
+                  #'pop-to-buffer)))
+    (funcall pop-fn "*yeetube*")
+    (yeetube-mode)
+    (setq yeetube-items items)
+    (setq-local yeetube--continuation continuation)
+    (setq-local yeetube--results-limit limit)
+    (yeetube-ui-render items)
+    (yeetube-ui-fetch-thumbnails items "*yeetube*")))
+
+(defun yeetube--current-limit ()
+  "Return the active results limit, reading from the *yeetube* buffer."
+  (with-current-buffer (get-buffer-create "*yeetube*")
+    (or yeetube--results-limit yeetube-results-limit)))
+
+(defun yeetube--decode-url-buffer (url-buffer)
+  "Insert URL-BUFFER's body into the current buffer, decoded as UTF-8.
+Call from inside a `with-temp-buffer' so the inserted text is
+scoped to a throwaway buffer for parsing."
+  (set-buffer-multibyte t)
+  (url-insert url-buffer)
+  (decode-coding-region (point-min) (point-max) 'utf-8))
 
 (defun yeetube--rss-callback (status &optional fallback-url)
   "Yeetube RSS callback handling STATUS with FALLBACK-URL."
-  (let ((url-buffer (current-buffer))
-        (pop-fn (if yeetube-pop-to-same-window-p
-                    #'pop-to-buffer-same-window
-                  #'pop-to-buffer)))
+  (let ((url-buffer (current-buffer)))
     (unwind-protect
         (if (plist-get status :error)
-            (yeetube--rss-fallback fallback-url)
-          (let* ((limit (with-current-buffer (get-buffer-create "*yeetube*")
-                          (or yeetube--results-limit yeetube-results-limit)))
+            (when fallback-url (yeetube-display-content-from-url fallback-url))
+          (let* ((limit (yeetube--current-limit))
                  (items (condition-case nil
                             (with-temp-buffer
-                              (set-buffer-multibyte t)
-                              (url-insert url-buffer)
-                              (decode-coding-region (point-min) (point-max) 'utf-8)
+                              (yeetube--decode-url-buffer url-buffer)
                               (yeetube--rss-parse-buffer))
                           (error nil))))
-            (if items
-                (progn
-                  (funcall pop-fn "*yeetube*")
-                  (yeetube-mode)
-                  (setq yeetube-items items)
-                  (setq-local yeetube--continuation nil)
-                  (setq-local yeetube--results-limit limit)
-                  (yeetube-ui-render items)
-                  (yeetube-ui-fetch-thumbnails items "*yeetube*"))
-              (message "No RSS videos found")
-              (yeetube--rss-fallback fallback-url))))
+            (cond (items (yeetube--render-items items limit))
+                  (fallback-url
+                   (message "No RSS videos found")
+                   (yeetube-display-content-from-url fallback-url))
+                  (t (message "No RSS videos found")))))
       (kill-buffer url-buffer))))
 
 (defun yeetube-display-rss-feed (browse-id &optional fallback-url)
@@ -563,29 +574,17 @@ When RSS fails, display FALLBACK-URL with the regular scraper."
 
 (defun yeetube--callback (status)
   "Yeetube callback handling STATUS."
-  (let ((url-buffer (current-buffer))
-        (pop-fn (if yeetube-pop-to-same-window-p
-                    #'pop-to-buffer-same-window
-                  #'pop-to-buffer)))
+  (let ((url-buffer (current-buffer)))
     (unwind-protect
         (unless (plist-get status :error)
-          (let* ((limit (with-current-buffer (get-buffer-create "*yeetube*")
-                          (or yeetube--results-limit yeetube-results-limit)))
+          (let* ((limit (yeetube--current-limit))
                  (result (with-temp-buffer
-                           (set-buffer-multibyte t)
-                           (url-insert url-buffer)
-                           (decode-coding-region (point-min) (point-max) 'utf-8)
+                           (yeetube--decode-url-buffer url-buffer)
                            (yeetube-scraper-parse)))
                  (items (plist-get result :items))
                  (continuation (plist-get result :continuation)))
             (when items
-              (funcall pop-fn "*yeetube*")
-              (yeetube-mode)
-              (setq yeetube-items items)
-              (setq-local yeetube--continuation continuation)
-              (setq-local yeetube--results-limit limit)
-              (yeetube-ui-render items)
-              (yeetube-ui-fetch-thumbnails items "*yeetube*")
+              (yeetube--render-items items limit continuation)
               (when (and continuation (length< items limit))
                 (yeetube--auto-paginate limit)))))
       (kill-buffer url-buffer))))
