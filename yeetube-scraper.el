@@ -24,15 +24,38 @@
 (require 'cl-lib)
 (require 'subr-x)
 
+(defun yeetube-scraper--text-from-object (obj)
+  "Return text from OBJ, which may be a `simpleText' or `runs' wrapper.
+YouTube returns text fields in two forms depending on layout: a
+single `simpleText' string, or a `runs' array of segments to be
+concatenated.  Returns nil when neither shape is present."
+  (cond ((null obj) nil)
+        ((alist-get 'simpleText obj))
+        ((alist-get 'runs obj)
+         (mapconcat (lambda (run) (or (alist-get 'text run) ""))
+                    (alist-get 'runs obj)))))
+
+(defun yeetube-scraper--byline-runs (renderer)
+  "Return the first non-empty runs list among the byline candidates.
+Mirrors the fallback chain YouTube uses across layouts:
+`longBylineText' (search/channel pages), `ownerText' (some
+playlist views), `shortBylineText' (compact contexts)."
+  (cl-some (lambda (key)
+             (alist-get 'runs (alist-get key renderer)))
+           '(longBylineText ownerText shortBylineText)))
+
 (defun yeetube-scraper--extract-video (renderer)
   "Extract a video plist from a videoRenderer RENDERER alist."
-  (let* ((title-runs (alist-get 'runs (alist-get 'title renderer)))
-         (title (alist-get 'text (car title-runs)))
-         (views (alist-get 'simpleText (alist-get 'viewCountText renderer)))
-         (duration (alist-get 'simpleText (alist-get 'lengthText renderer)))
-         (date-raw (alist-get 'simpleText (alist-get 'publishedTimeText renderer)))
+  (let* ((title (yeetube-scraper--text-from-object
+                 (alist-get 'title renderer)))
+         (views (yeetube-scraper--text-from-object
+                 (alist-get 'viewCountText renderer)))
+         (duration (yeetube-scraper--text-from-object
+                    (alist-get 'lengthText renderer)))
+         (date-raw (yeetube-scraper--text-from-object
+                    (alist-get 'publishedTimeText renderer)))
          (date (when date-raw (string-replace "Streamed " "" date-raw)))
-         (byline-runs (alist-get 'runs (alist-get 'longBylineText renderer)))
+         (byline-runs (yeetube-scraper--byline-runs renderer))
          (channel (alist-get 'text (car byline-runs)))
          (browse-endpoint (alist-get 'browseEndpoint
 				     (alist-get 'navigationEndpoint (car byline-runs))))

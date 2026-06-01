@@ -75,6 +75,65 @@
          (result (yeetube-scraper--extract-video renderer)))
     (should (equal "2 days ago" (plist-get result :date)))))
 
+;;; Group 1b: text-from-object helper
+
+(ert-deftest yeetube-scraper-test-text-from-object-simple-text ()
+  "Returns the `simpleText' string when present."
+  (should (equal "Hello"
+                 (yeetube-scraper--text-from-object
+                  '((simpleText . "Hello"))))))
+
+(ert-deftest yeetube-scraper-test-text-from-object-single-run ()
+  "Returns the lone run's text when only `runs' is present."
+  (should (equal "Hello"
+                 (yeetube-scraper--text-from-object
+                  '((runs ((text . "Hello"))))))))
+
+(ert-deftest yeetube-scraper-test-text-from-object-multi-runs ()
+  "Concatenates every run's text in order."
+  (should (equal "Hello, world!"
+                 (yeetube-scraper--text-from-object
+                  '((runs ((text . "Hello, "))
+                          ((text . "world!"))))))))
+
+(ert-deftest yeetube-scraper-test-text-from-object-nil ()
+  "Returns nil for a nil object or empty wrapper."
+  (should-not (yeetube-scraper--text-from-object nil))
+  (should-not (yeetube-scraper--text-from-object '((foo . "bar")))))
+
+(ert-deftest yeetube-scraper-test-extract-video-views-from-runs ()
+  "Falls through to `runs' when `viewCountText' lacks `simpleText'."
+  (let* ((renderer '((videoId . "rid1")
+                     (title (runs ((text . "T"))))
+                     (viewCountText (runs ((text . "1.2K "))
+                                          ((text . "views"))))))
+         (result (yeetube-scraper--extract-video renderer)))
+    (should (equal "1.2K views" (plist-get result :views)))))
+
+(ert-deftest yeetube-scraper-test-extract-video-multi-run-title ()
+  "Multi-segment titles are concatenated, not truncated to the first run."
+  (let* ((renderer '((videoId . "rid2")
+                     (title (runs ((text . "Part 1 — "))
+                                  ((text . "Part 2"))))))
+         (result (yeetube-scraper--extract-video renderer)))
+    (should (equal "Part 1 — Part 2" (plist-get result :title)))))
+
+(ert-deftest yeetube-scraper-test-extract-video-channel-from-owner-text ()
+  "Falls back to `ownerText' when `longBylineText' is missing."
+  (let* ((renderer '((videoId . "rid3")
+                     (title (runs ((text . "T"))))
+                     (ownerText (runs ((text . "OwnerChannel"))))))
+         (result (yeetube-scraper--extract-video renderer)))
+    (should (equal "OwnerChannel" (plist-get result :channel)))))
+
+(ert-deftest yeetube-scraper-test-extract-video-channel-from-short-byline ()
+  "Falls back to `shortBylineText' when longByline + ownerText are missing."
+  (let* ((renderer '((videoId . "rid4")
+                     (title (runs ((text . "T"))))
+                     (shortBylineText (runs ((text . "ShortName"))))))
+         (result (yeetube-scraper--extract-video renderer)))
+    (should (equal "ShortName" (plist-get result :channel)))))
+
 ;;; Group 2: lockupViewModel playlist extraction
 
 (ert-deftest yeetube-scraper-test-extract-playlist ()
