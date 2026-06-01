@@ -157,20 +157,20 @@
 
 (ert-deftest yeetube-test-channel-url-handle ()
   "Channel URLs are built without duplicate slashes for handles."
-  (should (equal "https://youtube.com/@foo/videos?ucbcb=1"
-                 (yeetube--channel-url "@foo" "videos?ucbcb=1"))))
+  (should (equal "https://youtube.com/@foo/videos"
+                 (yeetube--channel-url "@foo" "videos"))))
 
 (ert-deftest yeetube-test-channel-url-channel-path ()
   "Channel URLs are built without duplicate slashes for channel paths."
-  (should (equal "https://youtube.com/channel/UCsystemcrafters/streams?ucbcb=1"
+  (should (equal "https://youtube.com/channel/UCsystemcrafters/streams"
                  (yeetube--channel-url "/channel/UCsystemcrafters"
-                                       "streams?ucbcb=1"))))
+                                       "streams"))))
 
 (ert-deftest yeetube-test-channel-url-search ()
   "Channel search URLs include the query without duplicate slashes."
-  (should (equal "https://youtube.com/@foo/search?query=bar&ucbcb=1"
+  (should (equal "https://youtube.com/@foo/search?query=bar"
                  (yeetube--channel-url "@foo"
-                                       "search?query=bar&ucbcb=1"))))
+                                       "search?query=bar"))))
 
 (ert-deftest yeetube-test-channel-videos-scrapes ()
   "Channel videos scrapes the channel videos page."
@@ -182,7 +182,7 @@
           (yeetube-channel-videos "/channel/UCsystemcrafters"))
       (when (get-buffer "*yeetube*")
         (kill-buffer "*yeetube*")))
-    (should (equal "https://youtube.com/channel/UCsystemcrafters/videos?ucbcb=1"
+    (should (equal "https://youtube.com/channel/UCsystemcrafters/videos"
                    scrape-url))))
 
 ;;; Group 10: yeetube RSS parsing
@@ -231,25 +231,25 @@
 
 (ert-deftest yeetube-test-rss-callback-falls-back-on-retrieval-error ()
   "RSS callback displays the fallback URL when retrieval fails."
-  (should (equal "https://youtube.com/@systemcrafters/videos?ucbcb=1"
+  (should (equal "https://youtube.com/@systemcrafters/videos"
                  (yeetube-test--rss-callback-fallback-url
                   '(:error (error http 500))
-                  "https://youtube.com/@systemcrafters/videos?ucbcb=1"))))
+                  "https://youtube.com/@systemcrafters/videos"))))
 
 (ert-deftest yeetube-test-rss-callback-falls-back-on-malformed-xml ()
   "RSS callback displays the fallback URL when XML parsing fails."
-  (should (equal "https://youtube.com/@systemcrafters/videos?ucbcb=1"
+  (should (equal "https://youtube.com/@systemcrafters/videos"
                  (yeetube-test--rss-callback-fallback-url
                   nil
-                  "https://youtube.com/@systemcrafters/videos?ucbcb=1"
+                  "https://youtube.com/@systemcrafters/videos"
                   "<feed><entry>"))))
 
 (ert-deftest yeetube-test-rss-callback-falls-back-on-empty-feed ()
   "RSS callback displays the fallback URL when the feed has no videos."
-  (should (equal "https://youtube.com/@systemcrafters/videos?ucbcb=1"
+  (should (equal "https://youtube.com/@systemcrafters/videos"
                  (yeetube-test--rss-callback-fallback-url
                   nil
-                  "https://youtube.com/@systemcrafters/videos?ucbcb=1"
+                  "https://youtube.com/@systemcrafters/videos"
                   "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <feed xmlns=\"http://www.w3.org/2005/Atom\" xmlns:yt=\"http://www.youtube.com/xml/schemas/2015\">
 </feed>"))))
@@ -337,7 +337,17 @@
     (should (equal "https://i.ytimg.com/vi/abc123/mqdefault.jpg"
                    (plist-get (car items) :thumbnail-url)))))
 
-;;; Group 11: yeetube-mode buffer-local settings
+;;; Group 11: HTTP request headers
+
+(ert-deftest yeetube-test-request-headers-cookie-bypasses-consent ()
+  "Cookie header carries ucbcb / gdpr consent-bypass values."
+  (let ((cookie (cdr (assoc "Cookie" yeetube-request-headers))))
+    (should (stringp cookie))
+    (should (string-match-p "ucbcb=1" cookie))
+    (should (string-match-p "gdpr=1" cookie))
+    (should (string-match-p "cookieconsent_status=allow" cookie))))
+
+;;; Group 12: yeetube-mode buffer-local settings
 
 (ert-deftest yeetube-test-mode-sets-truncate-string-ellipsis ()
   "yeetube-mode sets truncate-string-ellipsis to a single space."

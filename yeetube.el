@@ -205,11 +205,19 @@ videos from.")
     ("Rating" . "CAESAhAB"))
   "YouTube's opaque sort filter codes, appended as &sp= parameter.")
 
-(defvar yeetube-request-headers
+(defcustom yeetube-request-headers
   '(("Accept-Language" . "en-US,en;q=0.9")
     ("Accept" . "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8")
-    ("User-Agent" . "Mozilla/5.0 (Windows NT 10.0; rv:126.0) Gecko/20100101 Firefox/126.0"))
-  "HTTP Request extra headers.")
+    ("User-Agent" . "Mozilla/5.0 (X11; Linux x86_64; rv:140.0) Gecko/20100101 Firefox/140.0")
+    ("Cookie" . "ucbcb=1; gdpr=1; cookieconsent_status=allow"))
+  "HTTP request headers sent on every yeetube fetch.
+Bound around `url-retrieve' as `url-request-extra-headers'.  The
+default `Cookie' header bypasses YouTube's EU cookie-consent
+redirect via `ucbcb=1', plus the broader `gdpr=1' /
+`cookieconsent_status=allow' pair for any CMP we land on.  Adjust
+`Accept-Language' to bias responses to your locale."
+  :type '(alist :key-type string :value-type string)
+  :group 'yeetube)
 
 (defvar yeetube--client-version "2.20260414.01.00"
   "YouTube API client version for continuation requests.")
@@ -608,8 +616,9 @@ When RSS fails, display FALLBACK-URL with the regular scraper."
     (erase-buffer)
     (insert (propertize "Loading..." 'face 'bold-italic)))
   (yeetube-display-content-from-url
-   ;; ucbcb=1 bypasses EU cookie consent redirect
-   (format "https://youtube.com/search?q=%s&ucbcb=1%s"
+   ;; `ucbcb=1' bypasses EU cookie consent; sent via the Cookie header
+   ;; configured in `yeetube-request-headers'.
+   (format "https://youtube.com/search?q=%s%s"
            (url-hexify-string query)
            (if yeetube-filter
 	       (format "&sp=%s" (yeetube-get-filter-code yeetube-filter))
@@ -686,7 +695,7 @@ When RSS fails, display FALLBACK-URL with the regular scraper."
   (with-current-buffer (get-buffer-create "*yeetube*")
     (setf yeetube--channel-id (yeetube--normalize-channel-id channel-id))
     (yeetube-display-content-from-url
-     (yeetube--channel-url channel-id "videos?ucbcb=1"))))
+     (yeetube--channel-url channel-id "videos"))))
 
 (defun yeetube-channel-streams (&optional channel-id)
   "View streams for the channel with CHANNEL-ID."
@@ -695,14 +704,14 @@ When RSS fails, display FALLBACK-URL with the regular scraper."
   (with-current-buffer (get-buffer-create "*yeetube*")
     (setf yeetube--channel-id (yeetube--normalize-channel-id channel-id))
     (yeetube-display-content-from-url
-     (yeetube--channel-url channel-id "streams?ucbcb=1"))))
+     (yeetube--channel-url channel-id "streams"))))
 
 (defun yeetube-channel-search (channel-id query)
   "Search channel with CHANNEL-ID for videos matching QUERY."
   (interactive (list (yeetube-channel-id-at-point) (yeetube-read-query)))
   (yeetube-display-content-from-url
    (yeetube--channel-url
-    channel-id (format "search?query=%s&ucbcb=1" (url-hexify-string query)))))
+    channel-id (format "search?query=%s" (url-hexify-string query)))))
 
 
 ;;; Mode
