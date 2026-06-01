@@ -44,6 +44,9 @@
 (require 'url-handlers)
 (require 'xdg)
 (require 'json)
+(require 'subr-x)
+(require 'xml)
+(require 'dom)
 
 (require 'keymap-popup)
 (require 'yeetube-scraper)
@@ -247,6 +250,14 @@ videos from.")
          (item (yeetube--find-item id)))
     (plist-get item :channel-id)))
 
+(defun yeetube--browse-id-at-point ()
+  "Return YouTube browse ID for the item at point.
+Dormant infrastructure: consumed by the future `yeetube-home'
+RSS-feed view (see the `yeetube--rss-*' family in this file)."
+  (let* ((id (tabulated-list-get-id))
+         (item (yeetube--find-item id)))
+    (plist-get item :browse-id)))
+
 (defun yeetube--normalize-channel-id (channel-id)
   "Return normalized channel identifier from CHANNEL-ID."
   (cond ((string-prefix-p "/@" channel-id) (substring channel-id 2))
@@ -424,6 +435,109 @@ Optionally, provide custom own URL."
 
 
 ;;; Search & Callbacks
+
+;; The `yeetube--rss-*' family and `yeetube-display-rss-feed' below are
+;; dormant infrastructure intended for the upcoming `yeetube-home'
+;; subscription/feed view.  They are not wired into any interactive
+;; command yet: `yeetube-channel-videos' scrapes the HTML videos tab
+;; instead, which is the only way to get duration/views and to paginate
+;; past YouTube's 15-entry RSS cap.
+
+(defun yeetube--rss-feed-url (browse-id)
+  "Return YouTube RSS feed URL for BROWSE-ID."
+  (concat yeetube-rss-feed-url browse-id))
+
+(defun yeetube--rss-entry-text (entry tag)
+  "Return text for direct child TAG in RSS ENTRY, or an empty string."
+  (or (when-let* ((node (dom-child-by-tag entry tag)))
+        (string-trim (dom-inner-text node)))
+      ""))
+
+(defun yeetube--rss-author-name (entry)
+  "Return author name from RSS ENTRY, or an empty string."
+  (or (when-let* ((author (dom-child-by-tag entry 'author))
+                  (name (dom-child-by-tag author 'name)))
+        (string-trim (dom-inner-text name)))
+      ""))
+
+(defun yeetube--rss-channel-path (browse-id)
+  "Return channel path for BROWSE-ID, or an empty string."
+  (if (string-empty-p browse-id)
+      ""
+    (format "/channel/%s" browse-id)))
+
+(defun yeetube--rss-entry-item (entry)
+  "Convert RSS ENTRY to a yeetube item plist."
+  (let* ((id (yeetube--rss-entry-text entry 'yt:videoId))
+         (browse-id (yeetube--rss-entry-text entry 'yt:channelId))
+         (published (yeetube--rss-entry-text entry 'published))
+         (date (or (and (not (string-empty-p published)) published)
+                   (yeetube--rss-entry-text entry 'updated))))
+    (and (not (string-empty-p id))
+         (list :id id
+               :title (yeetube--rss-entry-text entry 'title)
+               :channel (yeetube--rss-author-name entry)
+               :channel-id (yeetube--rss-channel-path browse-id)
+               :browse-id browse-id
+               :thumbnail-url (format "https://i.ytimg.com/vi/%s/default.jpg" id)
+               :views ""
+               :duration ""
+               :date date
+               :type 'video))))
+
+(defun yeetube--rss-parse-buffer ()
+  "Parse current YouTube RSS feed buffer into yeetube item plists."
+  (let* ((feed (car (xml-parse-region (point-min) (point-max))))
+         (entries (and feed (dom-by-tag feed 'entry))))
+    (delq nil (mapcar #'yeetube--rss-entry-item entries))))
+
+(defun yeetube--rss-fallback (fallback-url)
+  "Display FALLBACK-URL with the regular scraper when non-nil."
+  (when fallback-url
+    (yeetube-display-content-from-url fallback-url)))
+
+(defun yeetube--rss-callback (status &optional fallback-url)
+  "Yeetube RSS callback handling STATUS with FALLBACK-URL."
+  (let ((url-buffer (current-buffer))
+        (pop-fn (if yeetube-pop-to-same-window-p
+                    #'pop-to-buffer-same-window
+                  #'pop-to-buffer)))
+    (unwind-protect
+        (if (plist-get status :error)
+            (yeetube--rss-fallback fallback-url)
+          (let* ((limit (with-current-buffer (get-buffer-create "*yeetube*")
+                          (or yeetube--results-limit yeetube-results-limit)))
+                 (items (condition-case nil
+                            (with-temp-buffer
+                              (set-buffer-multibyte t)
+                              (url-insert url-buffer)
+                              (decode-coding-region (point-min) (point-max) 'utf-8)
+                              (yeetube--rss-parse-buffer))
+                          (error nil))))
+            (if items
+                (progn
+                  (funcall pop-fn "*yeetube*")
+                  (yeetube-mode)
+                  (setq yeetube-items items)
+                  (setq-local yeetube--continuation nil)
+                  (setq-local yeetube--results-limit limit)
+                  (yeetube-ui-render items)
+                  (yeetube-ui-fetch-thumbnails items "*yeetube*"))
+              (message "No RSS videos found")
+              (yeetube--rss-fallback fallback-url))))
+      (kill-buffer url-buffer))))
+
+(defun yeetube-display-rss-feed (browse-id &optional fallback-url)
+  "Display channel videos from RSS feed for BROWSE-ID.
+When RSS fails, display FALLBACK-URL with the regular scraper."
+  (with-current-buffer (get-buffer-create "*yeetube*")
+    (setq-local yeetube--current-url (yeetube--rss-feed-url browse-id))
+    (let ((url-request-extra-headers yeetube-request-headers)
+          (callback-args (and fallback-url (list fallback-url))))
+      (if yeetube-enable-tor
+          (yeetube-with-tor-socks
+           (url-retrieve yeetube--current-url #'yeetube--rss-callback callback-args 'silent 'inhibit-cookies))
+        (url-retrieve yeetube--current-url #'yeetube--rss-callback callback-args 'silent 'inhibit-cookies)))))
 
 (defun yeetube--callback (status)
   "Yeetube callback handling STATUS."

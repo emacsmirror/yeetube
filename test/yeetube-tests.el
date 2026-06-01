@@ -185,7 +185,119 @@
     (should (equal "https://youtube.com/channel/UCsystemcrafters/videos?ucbcb=1"
                    scrape-url))))
 
-;;; Group 10: yeetube-mode buffer-local settings
+;;; Group 10: yeetube RSS parsing
+
+(defconst yeetube-test-rss-feed
+  "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<feed xmlns=\"http://www.w3.org/2005/Atom\" xmlns:yt=\"http://www.youtube.com/xml/schemas/2015\">
+  <entry>
+    <yt:videoId>abc123</yt:videoId>
+    <yt:channelId>UCsystemcrafters</yt:channelId>
+    <title>First video</title>
+    <published>2026-05-01T12:00:00+00:00</published>
+    <updated>2026-05-02T12:00:00+00:00</updated>
+    <author>
+      <name>System Crafters</name>
+      <uri>https://www.youtube.com/channel/UCsystemcrafters</uri>
+    </author>
+  </entry>
+  <entry>
+    <yt:videoId>def456</yt:videoId>
+    <yt:channelId>UCsystemcrafters</yt:channelId>
+    <title>Second video</title>
+    <updated>2026-05-03T12:00:00+00:00</updated>
+    <author>
+      <name>System Crafters</name>
+    </author>
+  </entry>
+</feed>")
+
+(defun yeetube-test--rss-callback-fallback-url (status fallback-url &optional contents)
+  "Call `yeetube--rss-callback' with STATUS, FALLBACK-URL and CONTENTS."
+  (let ((buffer (generate-new-buffer " *yeetube-rss-test*"))
+        captured-url)
+    (unwind-protect
+        (progn
+          (with-current-buffer buffer
+            (when contents
+              (insert contents))
+            (cl-letf (((symbol-function 'yeetube-display-content-from-url)
+                       (lambda (url)
+                         (setq captured-url url))))
+              (yeetube--rss-callback status fallback-url)))
+          captured-url)
+      (when (buffer-live-p buffer)
+        (kill-buffer buffer)))))
+
+(ert-deftest yeetube-test-rss-callback-falls-back-on-retrieval-error ()
+  "RSS callback displays the fallback URL when retrieval fails."
+  (should (equal "https://youtube.com/@systemcrafters/videos?ucbcb=1"
+                 (yeetube-test--rss-callback-fallback-url
+                  '(:error (error http 500))
+                  "https://youtube.com/@systemcrafters/videos?ucbcb=1"))))
+
+(ert-deftest yeetube-test-rss-callback-falls-back-on-malformed-xml ()
+  "RSS callback displays the fallback URL when XML parsing fails."
+  (should (equal "https://youtube.com/@systemcrafters/videos?ucbcb=1"
+                 (yeetube-test--rss-callback-fallback-url
+                  nil
+                  "https://youtube.com/@systemcrafters/videos?ucbcb=1"
+                  "<feed><entry>"))))
+
+(ert-deftest yeetube-test-rss-callback-falls-back-on-empty-feed ()
+  "RSS callback displays the fallback URL when the feed has no videos."
+  (should (equal "https://youtube.com/@systemcrafters/videos?ucbcb=1"
+                 (yeetube-test--rss-callback-fallback-url
+                  nil
+                  "https://youtube.com/@systemcrafters/videos?ucbcb=1"
+                  "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<feed xmlns=\"http://www.w3.org/2005/Atom\" xmlns:yt=\"http://www.youtube.com/xml/schemas/2015\">
+</feed>"))))
+
+(ert-deftest yeetube-test-rss-parse-buffer-converts-videos ()
+  "RSS entries are converted to yeetube item plists."
+  (let ((items (with-temp-buffer
+                 (insert yeetube-test-rss-feed)
+                 (yeetube--rss-parse-buffer))))
+    (should (= 2 (length items)))
+    (let ((item (car items)))
+      (should (equal "abc123" (plist-get item :id)))
+      (should (equal "First video" (plist-get item :title)))
+      (should (equal "System Crafters" (plist-get item :channel)))
+      (should (equal "/channel/UCsystemcrafters" (plist-get item :channel-id)))
+      (should (equal "UCsystemcrafters" (plist-get item :browse-id)))
+      (should (equal "https://i.ytimg.com/vi/abc123/default.jpg"
+                     (plist-get item :thumbnail-url)))
+      (should (equal "" (plist-get item :views)))
+      (should (equal "" (plist-get item :duration)))
+      (should (equal "2026-05-01T12:00:00+00:00" (plist-get item :date)))
+      (should (eq 'video (plist-get item :type))))
+    (should (equal "def456" (plist-get (cadr items) :id)))
+    (should (equal "2026-05-03T12:00:00+00:00"
+                   (plist-get (cadr items) :date)))
+    (should (equal "" (plist-get (cadr items) :views)))
+    (should (equal "" (plist-get (cadr items) :duration)))))
+
+(ert-deftest yeetube-test-rss-parse-buffer-filters-entries-without-video-id ()
+  "RSS entries without video IDs are ignored."
+  (let ((items (with-temp-buffer
+                 (insert "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<feed xmlns=\"http://www.w3.org/2005/Atom\" xmlns:yt=\"http://www.youtube.com/xml/schemas/2015\">
+  <entry>
+    <yt:channelId>UCsystemcrafters</yt:channelId>
+    <title>Missing video ID</title>
+  </entry>
+  <entry>
+    <yt:videoId>abc123</yt:videoId>
+    <yt:channelId>UCsystemcrafters</yt:channelId>
+    <title>Valid video</title>
+  </entry>
+</feed>")
+                 (yeetube--rss-parse-buffer))))
+    (should (= 1 (length items)))
+    (should (equal "abc123" (plist-get (car items) :id)))))
+
+;;; Group 11: yeetube-mode buffer-local settings
 
 (ert-deftest yeetube-test-mode-sets-truncate-string-ellipsis ()
   "yeetube-mode sets truncate-string-ellipsis to a single space."
