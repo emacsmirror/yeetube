@@ -297,6 +297,46 @@
     (should (= 1 (length items)))
     (should (equal "abc123" (plist-get (car items) :id)))))
 
+(ert-deftest yeetube-test-rss-entry-views-from-media-statistics ()
+  "RSS :views is populated from media:statistics views attribute."
+  (let ((items (with-temp-buffer
+                 (insert "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<feed xmlns=\"http://www.w3.org/2005/Atom\"
+      xmlns:yt=\"http://www.youtube.com/xml/schemas/2015\"
+      xmlns:media=\"http://search.yahoo.com/mrss/\">
+  <entry>
+    <yt:videoId>abc123</yt:videoId>
+    <yt:channelId>UCsystemcrafters</yt:channelId>
+    <title>Stats</title>
+    <media:group>
+      <media:statistics views=\"4242\"/>
+    </media:group>
+  </entry>
+</feed>")
+                 (yeetube--rss-parse-buffer))))
+    (should (equal "4242" (plist-get (car items) :views)))))
+
+(ert-deftest yeetube-test-rss-entry-thumbnail-from-media-thumbnail ()
+  "RSS :thumbnail-url uses media:thumbnail and rewrites hqdefault."
+  (let ((items (with-temp-buffer
+                 (insert "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<feed xmlns=\"http://www.w3.org/2005/Atom\"
+      xmlns:yt=\"http://www.youtube.com/xml/schemas/2015\"
+      xmlns:media=\"http://search.yahoo.com/mrss/\">
+  <entry>
+    <yt:videoId>abc123</yt:videoId>
+    <yt:channelId>UCsystemcrafters</yt:channelId>
+    <title>Thumb</title>
+    <media:group>
+      <media:thumbnail url=\"https://i.ytimg.com/vi/abc123/hqdefault.jpg\"
+                       width=\"480\" height=\"360\"/>
+    </media:group>
+  </entry>
+</feed>")
+                 (yeetube--rss-parse-buffer))))
+    (should (equal "https://i.ytimg.com/vi/abc123/mqdefault.jpg"
+                   (plist-get (car items) :thumbnail-url)))))
+
 ;;; Group 11: yeetube-mode buffer-local settings
 
 (ert-deftest yeetube-test-mode-sets-truncate-string-ellipsis ()

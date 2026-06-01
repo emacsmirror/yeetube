@@ -466,6 +466,28 @@ Optionally, provide custom own URL."
       ""
     (format "/channel/%s" browse-id)))
 
+(defun yeetube--rss-entry-views (entry)
+  "Return view count string from ENTRY's `media:statistics' tag.
+YouTube nests `media:statistics' under `media:group', so this uses
+recursive descent.  The view count is exposed as the `views'
+attribute.  Returns an empty string when unavailable."
+  (or (when-let* ((node (car (dom-by-tag entry 'media:statistics)))
+                  (views (dom-attr node 'views)))
+        views)
+      ""))
+
+(defun yeetube--rss-entry-thumbnail (entry video-id)
+  "Return thumbnail URL for ENTRY, falling back to VIDEO-ID's default.
+YouTube nests `media:thumbnail' under `media:group', so this uses
+recursive descent.  Rewrites `hqdefault' to `mqdefault' because
+hqdefault adds black bars at the top and bottom (NewPipeExtractor
+does the same rewrite for the same reason)."
+  (or (when-let* ((node (car (dom-by-tag entry 'media:thumbnail)))
+                  (url (dom-attr node 'url))
+                  ((not (string-empty-p url))))
+        (string-replace "hqdefault" "mqdefault" url))
+      (format "https://i.ytimg.com/vi/%s/default.jpg" video-id)))
+
 (defun yeetube--rss-entry-item (entry)
   "Convert RSS ENTRY to a yeetube item plist."
   (let* ((id (yeetube--rss-entry-text entry 'yt:videoId))
@@ -479,8 +501,8 @@ Optionally, provide custom own URL."
                :channel (yeetube--rss-author-name entry)
                :channel-id (yeetube--rss-channel-path browse-id)
                :browse-id browse-id
-               :thumbnail-url (format "https://i.ytimg.com/vi/%s/default.jpg" id)
-               :views ""
+               :thumbnail-url (yeetube--rss-entry-thumbnail entry id)
+               :views (yeetube--rss-entry-views entry)
                :duration ""
                :date date
                :type 'video))))
