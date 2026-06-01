@@ -62,7 +62,25 @@
     (should (equal "Second" (plist-get (yeetube--find-item "def") :title)))
     (should-not (yeetube--find-item "nonexistent"))))
 
-;;; Group 4: yeetube-get-url
+;;; Group 4: yeetube--normalize-channel-id
+
+(ert-deftest yeetube-test-normalize-channel-id-path-handle ()
+  "Normalize canonical path channel handles."
+  (should (string= "foo" (yeetube--normalize-channel-id "/@foo"))))
+
+(ert-deftest yeetube-test-normalize-channel-id-handle ()
+  "Normalize channel handles."
+  (should (string= "foo" (yeetube--normalize-channel-id "@foo"))))
+
+(ert-deftest yeetube-test-normalize-channel-id-channel-path ()
+  "Normalize channel paths."
+  (should (string= "UCabc" (yeetube--normalize-channel-id "/channel/UCabc"))))
+
+(ert-deftest yeetube-test-normalize-channel-id-plain ()
+  "Plain channel ids are returned unchanged."
+  (should (string= "foo" (yeetube--normalize-channel-id "foo"))))
+
+;;; Group 5: yeetube-get-url
 
 (ert-deftest yeetube-test-get-url-video ()
   "Get URL for a video."
@@ -77,7 +95,7 @@
     (should (equal "https://youtube.com/playlist?list=PLxyz"
                    (yeetube-get-url "PLxyz" 'playlist)))))
 
-;;; Group 5: yeetube-mpv-play returns a process (regression)
+;;; Group 6: yeetube-mpv-play returns a process (regression)
 
 (ert-deftest yeetube-test-mpv-play-returns-process ()
   "Verify yeetube-mpv-play returns the process object."
@@ -95,7 +113,7 @@
       (when (process-live-p proc)
         (delete-process proc)))))
 
-;;; Group 6: yeetube-save-saved-videos round-trip (regression)
+;;; Group 7: yeetube-save-saved-videos round-trip (regression)
 
 (ert-deftest yeetube-test-save-saved-videos-round-trip ()
   "Saved videos can be written and read back."
@@ -113,7 +131,7 @@
                          yeetube-saved-videos)))
       (delete-directory temp-dir t))))
 
-;;; Group 7: yeetube-mode-map keybindings
+;;; Group 8: yeetube-mode-map keybindings
 
 (ert-deftest yeetube-test-keymap-s-bound-to-search ()
   "Lowercase s is bound to yeetube-search."
@@ -135,7 +153,39 @@
   "M-n is bound to yeetube-next-page."
   (should (eq 'yeetube-next-page (lookup-key yeetube-mode-map (kbd "M-n")))))
 
-;;; Group 8: yeetube-mode buffer-local settings
+;;; Group 9: yeetube--channel-url & channel-videos
+
+(ert-deftest yeetube-test-channel-url-handle ()
+  "Channel URLs are built without duplicate slashes for handles."
+  (should (equal "https://youtube.com/@foo/videos?ucbcb=1"
+                 (yeetube--channel-url "@foo" "videos?ucbcb=1"))))
+
+(ert-deftest yeetube-test-channel-url-channel-path ()
+  "Channel URLs are built without duplicate slashes for channel paths."
+  (should (equal "https://youtube.com/channel/UCsystemcrafters/streams?ucbcb=1"
+                 (yeetube--channel-url "/channel/UCsystemcrafters"
+                                       "streams?ucbcb=1"))))
+
+(ert-deftest yeetube-test-channel-url-search ()
+  "Channel search URLs include the query without duplicate slashes."
+  (should (equal "https://youtube.com/@foo/search?query=bar&ucbcb=1"
+                 (yeetube--channel-url "@foo"
+                                       "search?query=bar&ucbcb=1"))))
+
+(ert-deftest yeetube-test-channel-videos-scrapes ()
+  "Channel videos scrapes the channel videos page."
+  (let (scrape-url)
+    (unwind-protect
+        (cl-letf (((symbol-function 'yeetube-display-content-from-url)
+                   (lambda (url)
+                     (setq scrape-url url))))
+          (yeetube-channel-videos "/channel/UCsystemcrafters"))
+      (when (get-buffer "*yeetube*")
+        (kill-buffer "*yeetube*")))
+    (should (equal "https://youtube.com/channel/UCsystemcrafters/videos?ucbcb=1"
+                   scrape-url))))
+
+;;; Group 10: yeetube-mode buffer-local settings
 
 (ert-deftest yeetube-test-mode-sets-truncate-string-ellipsis ()
   "yeetube-mode sets truncate-string-ellipsis to a single space."

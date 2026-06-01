@@ -247,6 +247,19 @@ videos from.")
          (item (yeetube--find-item id)))
     (plist-get item :channel-id)))
 
+(defun yeetube--normalize-channel-id (channel-id)
+  "Return normalized channel identifier from CHANNEL-ID."
+  (cond ((string-prefix-p "/@" channel-id) (substring channel-id 2))
+        ((string-prefix-p "@" channel-id) (substring channel-id 1))
+        ((string-prefix-p "/channel/" channel-id) (substring channel-id 9))
+        (t channel-id)))
+
+(defun yeetube--channel-url (channel-id path)
+  "Return a YouTube channel URL for CHANNEL-ID and PATH."
+  (format "https://youtube.com/%s/%s"
+          (string-remove-prefix "/" channel-id)
+          (string-remove-prefix "/" path)))
+
 (defun yeetube-read-query ()
   "Interactively read a search term."
   (read-string "Yeetube Search: " nil 'yeetube-search-history))
@@ -534,26 +547,27 @@ Optionally, provide custom own URL."
 (defun yeetube-channel-videos (&optional channel-id)
   "View videos for the channel with CHANNEL-ID."
   (interactive (list (or (yeetube-channel-id-at-point)
-			 (format "@%s" (read-string "Channel: ")))))
+                         (format "@%s" (read-string "Channel: ")))))
   (with-current-buffer (get-buffer-create "*yeetube*")
-    (setf yeetube--channel-id (substring channel-id 2))
+    (setf yeetube--channel-id (yeetube--normalize-channel-id channel-id))
     (yeetube-display-content-from-url
-     (format "https://youtube.com/%s/videos?ucbcb=1" channel-id))))
+     (yeetube--channel-url channel-id "videos?ucbcb=1"))))
 
 (defun yeetube-channel-streams (&optional channel-id)
   "View streams for the channel with CHANNEL-ID."
   (interactive (list (or (yeetube-channel-id-at-point)
 			 (format "@%s" (read-string "Channel: ")))))
   (with-current-buffer (get-buffer-create "*yeetube*")
-    (setf yeetube--channel-id (substring channel-id 2))
-    (yeetube-display-content-from-url (format "https://youtube.com/%s/streams?ucbcb=1" channel-id))))
+    (setf yeetube--channel-id (yeetube--normalize-channel-id channel-id))
+    (yeetube-display-content-from-url
+     (yeetube--channel-url channel-id "streams?ucbcb=1"))))
 
 (defun yeetube-channel-search (channel-id query)
   "Search channel with CHANNEL-ID for videos matching QUERY."
   (interactive (list (yeetube-channel-id-at-point) (yeetube-read-query)))
   (yeetube-display-content-from-url
-   (format "https://youtube.com/%s/search?query=%s&ucbcb=1"
-           channel-id (url-hexify-string query))))
+   (yeetube--channel-url
+    channel-id (format "search?query=%s&ucbcb=1" (url-hexify-string query)))))
 
 
 ;;; Mode
