@@ -633,6 +633,7 @@ When RSS fails, display FALLBACK-URL with the regular scraper."
              (length< yeetube-items limit))
     (yeetube-next-page)))
 
+;;;###autoload
 (defun yeetube-next-page ()
   "Fetch and append the next page of results."
   (interactive)
@@ -688,6 +689,7 @@ When RSS fails, display FALLBACK-URL with the regular scraper."
 
 ;;; Channel browsing
 
+;;;###autoload
 (defun yeetube-channel-videos (&optional channel-id)
   "View videos for the channel with CHANNEL-ID."
   (interactive (list (or (yeetube-channel-id-at-point)
@@ -697,10 +699,11 @@ When RSS fails, display FALLBACK-URL with the regular scraper."
     (yeetube-display-content-from-url
      (yeetube--channel-url channel-id "videos"))))
 
+;;;###autoload
 (defun yeetube-channel-streams (&optional channel-id)
   "View streams for the channel with CHANNEL-ID."
   (interactive (list (or (yeetube-channel-id-at-point)
-			 (format "@%s" (read-string "Channel: ")))))
+                         (format "@%s" (read-string "Channel: ")))))
   (with-current-buffer (get-buffer-create "*yeetube*")
     (setf yeetube--channel-id (yeetube--normalize-channel-id channel-id))
     (yeetube-display-content-from-url
