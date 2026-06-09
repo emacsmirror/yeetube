@@ -254,9 +254,20 @@ redirect via `ucbcb=1', plus the broader `gdpr=1' /
 
 (defun yeetube-channel-id-at-point ()
   "Return yeetube channel id at point."
-  (let* ((id (tabulated-list-get-id))
-         (item (yeetube--find-item id)))
-    (plist-get item :channel-id)))
+  (when (derived-mode-p 'yeetube-mode)
+    (let* ((id (tabulated-list-get-id))
+           (item (yeetube--find-item id)))
+      (plist-get item :channel-id))))
+
+(defun yeetube--read-channel-id ()
+  "Read a YouTube channel identifier."
+  (let ((channel (string-trim (read-string "Channel: "))))
+    (cond ((string-empty-p channel)
+           (user-error "No channel specified"))
+          ((or (string-prefix-p "@" channel)
+               (string-prefix-p "/" channel))
+           channel)
+          (t (format "@%s" channel)))))
 
 (defun yeetube--browse-id-at-point ()
   "Return YouTube browse ID for the item at point.
@@ -689,25 +700,32 @@ When RSS fails, display FALLBACK-URL with the regular scraper."
 
 ;;; Channel browsing
 
+(defun yeetube--display-channel-path (channel-id path)
+  "Display channel CHANNEL-ID content at PATH."
+  (unless (and (stringp channel-id)
+               (not (string-empty-p (string-trim channel-id))))
+    (user-error "No channel ID available"))
+  (let* ((channel-id (string-trim channel-id))
+         (normalized-id (yeetube--normalize-channel-id channel-id))
+         (url (yeetube--channel-url channel-id path)))
+    (message "Fetching channel %s from %s" normalized-id url)
+    (with-current-buffer (get-buffer-create "*yeetube*")
+      (setf yeetube--channel-id normalized-id)
+      (yeetube-display-content-from-url url))))
+
 ;;;###autoload
 (defun yeetube-channel-videos (&optional channel-id)
   "View videos for the channel with CHANNEL-ID."
   (interactive (list (or (yeetube-channel-id-at-point)
-                         (format "@%s" (read-string "Channel: ")))))
-  (with-current-buffer (get-buffer-create "*yeetube*")
-    (setf yeetube--channel-id (yeetube--normalize-channel-id channel-id))
-    (yeetube-display-content-from-url
-     (yeetube--channel-url channel-id "videos"))))
+                         (yeetube--read-channel-id))))
+  (yeetube--display-channel-path channel-id "videos"))
 
 ;;;###autoload
 (defun yeetube-channel-streams (&optional channel-id)
   "View streams for the channel with CHANNEL-ID."
   (interactive (list (or (yeetube-channel-id-at-point)
-                         (format "@%s" (read-string "Channel: ")))))
-  (with-current-buffer (get-buffer-create "*yeetube*")
-    (setf yeetube--channel-id (yeetube--normalize-channel-id channel-id))
-    (yeetube-display-content-from-url
-     (yeetube--channel-url channel-id "streams"))))
+                         (yeetube--read-channel-id))))
+  (yeetube--display-channel-path channel-id "streams"))
 
 (defun yeetube-channel-search (channel-id query)
   "Search channel with CHANNEL-ID for videos matching QUERY."

@@ -185,6 +185,31 @@
     (should (equal "https://youtube.com/channel/UCsystemcrafters/videos"
                    scrape-url))))
 
+(ert-deftest yeetube-test-display-channel-path-errors-without-channel ()
+  "Channel browsing requires a channel ID."
+  (should-error (yeetube--display-channel-path nil "videos")
+                :type 'user-error)
+  (should-error (yeetube--display-channel-path "  " "streams")
+                :type 'user-error))
+
+(ert-deftest yeetube-test-read-channel-id-errors-on-empty-input ()
+  "Manual channel input rejects empty strings."
+  (cl-letf (((symbol-function 'read-string) (lambda (&rest _) "  ")))
+    (should-error (yeetube--read-channel-id) :type 'user-error)))
+
+(ert-deftest yeetube-test-read-channel-id-adds-handle-prefix ()
+  "Manual channel input treats plain names as handles."
+  (cl-letf (((symbol-function 'read-string) (lambda (&rest _) "foo")))
+    (should (equal "@foo" (yeetube--read-channel-id)))))
+
+(ert-deftest yeetube-test-read-channel-id-preserves-prefixed-input ()
+  "Manual channel input preserves handles and channel paths."
+  (cl-letf (((symbol-function 'read-string) (lambda (&rest _) "@foo")))
+    (should (equal "@foo" (yeetube--read-channel-id))))
+  (cl-letf (((symbol-function 'read-string)
+             (lambda (&rest _) "/channel/UCsystemcrafters")))
+    (should (equal "/channel/UCsystemcrafters" (yeetube--read-channel-id)))))
+
 ;;; Group 10: yeetube RSS parsing
 
 (defconst yeetube-test-rss-feed
