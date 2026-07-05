@@ -11,3 +11,5 @@
 *.info
 *.texi
 refs/*
+
+!AGENTS.md
