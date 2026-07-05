@@ -26,6 +26,8 @@
 
 ;;; Code:
 
+(require 'cl-lib)
+
 ;; Variables defined in yeetube.el (via keymap-popup-define)
 (defvar yeetube-ytdlp-program)
 (defvar yeetube-torsocks-program)
@@ -38,7 +40,7 @@
 
 (defcustom yeetube-mpv-program (and (executable-find "mpv") "mpv")
   "Path for mpv executable."
-  :type 'string
+  :type '(choice (const :tag "Not found" nil) string)
   :group 'yeetube)
 
 (defcustom yeetube-mpv-additional-flags nil
@@ -51,9 +53,7 @@
 
 (defun yeetube-mpv-modeline-string ()
   "Return modeline string for yeetube-mpv."
-  (if yeetube-mpv-currently-playing
-      (format "%s" yeetube-mpv-currently-playing)
-    "nil"))
+  (or yeetube-mpv-currently-playing ""))
 
 (defun yeetube-mpv-check ()
   "Check if mpv and yt-dlp is installed."
@@ -67,13 +67,10 @@
 (defun yeetube-mpv-process (command)
   "Start yeetube process for shell COMMAND."
   (yeetube-mpv-check)
-  (dolist (process (process-list))
-    (when (string= yeetube-mpv--process-name (process-name process))
-      (kill-process process)))
-  (sit-for 0.1)
-  (unless (get-process yeetube-mpv--process-name)
-    (start-process-shell-command
-     yeetube-mpv--process-name "*yeetube-mpv-output*" command)))
+  (when-let* ((old (get-process yeetube-mpv--process-name)))
+    (delete-process old))
+  (start-process-shell-command
+   yeetube-mpv--process-name "*yeetube-mpv-output*" command))
 
 (defun yeetube-mpv-ytdl-format-video-quality (resolution)
   "Return shell quoted argument for ytdlp with RESOLUTION."
@@ -97,16 +94,16 @@ it to play local files."
 		  " "
 		  (shell-quote-argument input)
 		  (when flags
-		    (concat " " (mapconcat #'identity flags " "))))))
+		    (concat " " (string-join flags " "))))))
     (let ((proc (yeetube-mpv-process yeetube-command)))
       (message "Yeetube command: %s" yeetube-command)
       (message (if yeetube-mpv-enable-torsocks
 		   "yeetube: Starting mpv process (Using Torsocks)"
 		 "yeetube: Starting mpv process"))
-      (setf yeetube-mpv-currently-playing (format "[%s]" info))
+      (setf yeetube-mpv-currently-playing (and info (format "[%s]" info)))
       proc)))
 
-(defconst yeetube-mpv-modeline-string
+(defconst yeetube-mpv--modeline-format
   '(:eval (format " ♫:%s" (yeetube-mpv-modeline-string))))
 
 (define-minor-mode yeetube-mpv-modeline-mode
@@ -118,8 +115,8 @@ To use this mode, you should set `yeetube-play-function' to
   :group 'yeetube
   :lighter nil
   (if yeetube-mpv-modeline-mode
-      (add-to-list 'global-mode-string yeetube-mpv-modeline-string)
-    (cl-callf2 delq yeetube-mpv-modeline-string global-mode-string))
+      (add-to-list 'global-mode-string yeetube-mpv--modeline-format)
+    (cl-callf2 delq yeetube-mpv--modeline-format global-mode-string))
   (force-mode-line-update))
 
 (defun yeetube-mpv-send-keypress (key)
