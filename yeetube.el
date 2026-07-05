@@ -539,7 +539,10 @@ major mode, populates state, and kicks off thumbnail fetching."
                     #'pop-to-buffer-same-window
                   #'pop-to-buffer)))
     (funcall pop-fn "*yeetube*")
-    (yeetube-mode)
+    ;; Enabling the mode kills buffer-locals, so re-renders must not
+    ;; reset settings like video quality or download directory.
+    (unless (derived-mode-p 'yeetube-mode)
+      (yeetube-mode))
     (setq yeetube-items items)
     (setq-local yeetube--continuation continuation)
     (setq-local yeetube--results-limit limit)
