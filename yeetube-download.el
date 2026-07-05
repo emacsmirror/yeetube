@@ -47,12 +47,12 @@ Optional values:
          (format-command (when audio-format
 			   (format "--extract-audio --audio-format %s"
 				   (shell-quote-argument audio-format))))
-         (command (mapconcat 'identity (delq nil
-					     (list tor-command
-						   yeetube-ytdlp-program
-						   (shell-quote-argument url)
-						   name-command format-command))
-			     " ")))
+         (command (string-join (delq nil
+                                     (list tor-command
+                                           yeetube-ytdlp-program
+                                           (shell-quote-argument url)
+                                           name-command format-command))
+                               " ")))
     (call-process-shell-command command nil 0)))
 
 ;;;###autoload

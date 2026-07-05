@@ -40,6 +40,7 @@
 (require 'compat)
 (require 'url)
 (require 'cl-lib)
+(require 'seq)
 (require 'socks)
 (require 'url-handlers)
 (require 'xdg)
@@ -61,11 +62,11 @@
 
 (defcustom yeetube-torsocks-program (and (executable-find "torsocks") "torsocks")
   "Path for torsocks executable."
-  :type 'string)
+  :type '(choice (const :tag "Not found" nil) string))
 
 (defcustom yeetube-ytdlp-program (and (executable-find "yt-dlp") "yt-dlp")
   "Path for yt-dlp executable."
-  :type 'string)
+  :type '(choice (const :tag "Not found" nil) string))
 
 (defcustom yeetube-results-limit 20
   "Define a limit for search results."
@@ -138,6 +139,9 @@ Valid options include:
 (defvar yeetube-invidious-instances
   '("vid.puffyan.us" "inv.nadeko.net" "invidious.flokinet.to")
   "List of invidious instances.")
+
+(defconst yeetube--buffer-name "*yeetube*"
+  "Name of the buffer displaying search results.")
 
 (defvar yeetube-content nil
   "Tabulated-list rows (ID VECTOR) pairs.")
@@ -215,8 +219,7 @@ default `Cookie' header bypasses YouTube's EU cookie-consent
 redirect via `ucbcb=1', plus the broader `gdpr=1' /
 `cookieconsent_status=allow' pair for any CMP we land on.  Adjust
 `Accept-Language' to bias responses to your locale."
-  :type '(alist :key-type string :value-type string)
-  :group 'yeetube)
+  :type '(alist :key-type string :value-type string))
 
 (defvar yeetube--client-version "2.20260414.01.00"
   "YouTube API client version for continuation requests.")
@@ -315,7 +318,7 @@ RSS-feed view (see the `yeetube--rss-*' family in this file)."
          (url (yeetube-get-url id (plist-get item :type)))
          (title (plist-get item :title))
          (proc (apply yeetube-play-function url
-                      (when yeetube-mpv-modeline-mode (list title)))))
+                      (and yeetube-mpv-modeline-mode (list title)))))
     (when (processp proc)
       (process-put proc :now-playing title))
     (push (list :url url :title title) yeetube-history)
@@ -357,31 +360,27 @@ Select entry title from `yeetube-history' and play corresponding URL."
 				     yeetube-history))
 	 (title (plist-get selected-entry :title))
          (url (plist-get selected-entry :url)))
-    (funcall yeetube-play-function url (when yeetube-mpv-modeline-mode title))
+    (funcall yeetube-play-function url (and yeetube-mpv-modeline-mode title))
     (message "Replaying: %s" selected)))
 
 ;;;###autoload
 (defun yeetube-browse-url ()
   "Open URL for video at point, using an invidious instance."
   (interactive)
-  (let ((invidious-instance (cond ((and (listp yeetube-invidious-instances)
-					(length> yeetube-invidious-instances 1))
-				   (nth (random (length yeetube-invidious-instances))
-					yeetube-invidious-instances))
-				  ((and (listp yeetube-invidious-instances)
-					(length= yeetube-invidious-instances 1))
-				   (car yeetube-invidious-instances))
-				  ((stringp yeetube-invidious-instances)
-				   yeetube-invidious-instances))))
+  (let ((instance (cond ((stringp yeetube-invidious-instances)
+                         yeetube-invidious-instances)
+                        (yeetube-invidious-instances
+                         (seq-random-elt yeetube-invidious-instances))
+                        (t (user-error "No invidious instances configured")))))
     (browse-url
-     (replace-regexp-in-string "youtube.com" invidious-instance (yeetube-get-url)))))
+     (string-replace "youtube.com" instance (yeetube-get-url)))))
 
 
 ;;; Bookmarks
 
 (defun yeetube-load-saved-videos ()
   "Load saved videos."
-  (let ((file-path (concat user-emacs-directory "yeetube")))
+  (let ((file-path (locate-user-emacs-file "yeetube")))
     (if (file-exists-p file-path)
 	(with-temp-buffer
 	  (insert-file-contents file-path)
@@ -410,10 +409,11 @@ If ARG is non-nil, save as a playlist URL."
   (interactive)
   (yeetube-load-saved-videos)
   (let* ((video (completing-read "Select video: " yeetube-saved-videos nil t))
-	 (url (cdr (assoc video yeetube-saved-videos)))
-	 (title (car (assoc video yeetube-saved-videos))))
-    (funcall yeetube-play-function url (when yeetube-mpv-modeline-mode title))
-    (message "Playing: %s" (car (assoc video yeetube-saved-videos)))))
+         (entry (assoc video yeetube-saved-videos))
+         (title (car entry))
+         (url (cdr entry)))
+    (funcall yeetube-play-function url (and yeetube-mpv-modeline-mode title))
+    (message "Playing: %s" title)))
 
 ;;;###autoload
 (defun yeetube-remove-saved-video ()
@@ -434,7 +434,7 @@ If ARG is non-nil, save as a playlist URL."
 
 (defun yeetube-save-saved-videos ()
   "Write `yeetube-saved-videos' to disk."
-  (let ((file-path (concat user-emacs-directory "yeetube")))
+  (let ((file-path (locate-user-emacs-file "yeetube")))
     (with-temp-buffer
       (insert (pp-to-string yeetube-saved-videos))
       (write-region (point-min) (point-max) file-path))))
@@ -548,7 +548,7 @@ major mode, populates state, and kicks off thumbnail fetching."
   (let ((pop-fn (if yeetube-pop-to-same-window-p
                     #'pop-to-buffer-same-window
                   #'pop-to-buffer)))
-    (funcall pop-fn "*yeetube*")
+    (funcall pop-fn yeetube--buffer-name)
     ;; Enabling the mode kills buffer-locals, so re-renders must not
     ;; reset settings like video quality or download directory.
     (unless (derived-mode-p 'yeetube-mode)
@@ -557,12 +557,13 @@ major mode, populates state, and kicks off thumbnail fetching."
     (setq-local yeetube--continuation continuation)
     (setq-local yeetube--results-limit limit)
     (yeetube-ui-render items)
-    (yeetube-ui-fetch-thumbnails items "*yeetube*")))
+    (yeetube-ui-fetch-thumbnails items yeetube--buffer-name)))
 
 (defun yeetube--current-limit ()
   "Return the active results limit, reading from the *yeetube* buffer."
-  (with-current-buffer (get-buffer-create "*yeetube*")
-    (or yeetube--results-limit yeetube-results-limit)))
+  (let ((buf (get-buffer yeetube--buffer-name)))
+    (or (and buf (buffer-local-value 'yeetube--results-limit buf))
+        yeetube-results-limit)))
 
 (defun yeetube--decode-url-buffer (url-buffer)
   "Insert URL-BUFFER's body into the current buffer, decoded as UTF-8.
@@ -594,7 +595,7 @@ scoped to a throwaway buffer for parsing."
 (defun yeetube-display-rss-feed (browse-id &optional fallback-url)
   "Display channel videos from RSS feed for BROWSE-ID.
 When RSS fails, display FALLBACK-URL with the regular scraper."
-  (with-current-buffer (get-buffer-create "*yeetube*")
+  (with-current-buffer (get-buffer-create yeetube--buffer-name)
     (setq-local yeetube--current-url (yeetube--rss-feed-url browse-id))
     (let ((url-request-extra-headers yeetube-request-headers)
           (callback-args (and fallback-url (list fallback-url))))
@@ -621,7 +622,7 @@ When RSS fails, display FALLBACK-URL with the regular scraper."
 
 (defun yeetube-display-content-from-url (url)
   "Display the video results from URL."
-  (with-current-buffer (get-buffer-create "*yeetube*")
+  (with-current-buffer (get-buffer-create yeetube--buffer-name)
     (setq-local yeetube--current-url url)
     (let ((url-request-extra-headers yeetube-request-headers))
       (yeetube-with-tor-socks
@@ -631,7 +632,7 @@ When RSS fails, display FALLBACK-URL with the regular scraper."
 (defun yeetube-search (query)
   "Search for QUERY."
   (interactive (list (yeetube-read-query)))
-  (pop-to-buffer-same-window "*yeetube*")
+  (pop-to-buffer-same-window yeetube--buffer-name)
   (let ((inhibit-read-only t))
     (erase-buffer)
     (insert (propertize "Loading..." 'face 'bold-italic)))
@@ -691,11 +692,11 @@ When RSS fails, display FALLBACK-URL with the regular scraper."
                  (items (plist-get result :items))
                  (continuation (plist-get result :continuation)))
             (when items
-              (with-current-buffer "*yeetube*"
+              (with-current-buffer yeetube--buffer-name
                 (setq yeetube-items (append yeetube-items items))
                 (setq-local yeetube--continuation continuation)
                 (yeetube-ui-append items)
-                (yeetube-ui-fetch-thumbnails items "*yeetube*")
+                (yeetube-ui-fetch-thumbnails items yeetube--buffer-name)
                 (when (and continuation
                            (length< yeetube-items
                                     (or yeetube--results-limit yeetube-results-limit)))
@@ -715,7 +716,7 @@ When RSS fails, display FALLBACK-URL with the regular scraper."
          (normalized-id (yeetube--normalize-channel-id channel-id))
          (url (yeetube--channel-url channel-id path)))
     (message "Fetching channel %s from %s" normalized-id url)
-    (with-current-buffer (get-buffer-create "*yeetube*")
+    (with-current-buffer (get-buffer-create yeetube--buffer-name)
       (setf yeetube--channel-id normalized-id)
       (yeetube-display-content-from-url url))))
 
