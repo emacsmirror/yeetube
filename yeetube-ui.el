@@ -31,11 +31,10 @@
 (defvar yeetube-default-sort-column)
 (defvar yeetube-default-sort-ascending)
 (defvar yeetube-request-headers)
-(defvar yeetube-enable-tor)
 (defvar yeetube-content)
 
 ;; Forward declarations -- functions from yeetube.el
-(declare-function yeetube-with-tor-socks "yeetube" (&rest body))
+(declare-function yeetube--queue-retrieve "yeetube" (url callback cbargs))
 
 
 ;;; Faces
@@ -273,14 +272,8 @@ Each element in ITEMS is a plist with at least :id and :thumbnail-url."
         (let ((url (plist-get item :thumbnail-url))
               (id (plist-get item :id)))
           (when (and url (not (string-empty-p url)))
-            (if yeetube-enable-tor
-                (yeetube-with-tor-socks
-                 (url-queue-retrieve url #'yeetube-ui--image-callback
-                                     (list id buffer)
-                                     'silent 'inhibit-cookies))
-              (url-queue-retrieve url #'yeetube-ui--image-callback
-                                  (list id buffer)
-                                  'silent 'inhibit-cookies))))))))
+            (yeetube--queue-retrieve url #'yeetube-ui--image-callback
+                                     (list id buffer))))))))
 
 (provide 'yeetube-ui)
 ;;; yeetube-ui.el ends here

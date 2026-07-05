@@ -235,11 +235,21 @@ redirect via `ucbcb=1', plus the broader `gdpr=1' /
   (cdr (assoc filter yeetube-filter-code-alist)))
 
 (defmacro yeetube-with-tor-socks (&rest body)
-  "Execute BODY with torsocks."
-  `(let ((url-gateway-method 'socks)
-         (socks-noproxy '("localhost"))
-         (socks-server '("Default server" "127.0.0.1" 9050 5)))
+  "Execute BODY, routed through tor when `yeetube-enable-tor' is non-nil."
+  `(let ((url-gateway-method (if yeetube-enable-tor 'socks url-gateway-method))
+         (socks-noproxy (if yeetube-enable-tor '("localhost") socks-noproxy))
+         (socks-server (if yeetube-enable-tor
+                           '("Default server" "127.0.0.1" 9050 5)
+                         socks-server)))
      ,@body))
+
+;; Function wrapper for use from other modules: the macro above is not
+;; available when they are byte-compiled, a call here resolves at runtime.
+(defun yeetube--queue-retrieve (url callback cbargs)
+  "Queue retrieval of URL, calling CALLBACK with CBARGS.
+Routed through tor when `yeetube-enable-tor' is non-nil."
+  (yeetube-with-tor-socks
+   (url-queue-retrieve url callback cbargs 'silent 'inhibit-cookies)))
 
 (defun yeetube-get-url (&optional id type)
   "Get video or playlist url for entry ID, adjusted for TYPE."
@@ -588,10 +598,9 @@ When RSS fails, display FALLBACK-URL with the regular scraper."
     (setq-local yeetube--current-url (yeetube--rss-feed-url browse-id))
     (let ((url-request-extra-headers yeetube-request-headers)
           (callback-args (and fallback-url (list fallback-url))))
-      (if yeetube-enable-tor
-          (yeetube-with-tor-socks
-           (url-retrieve yeetube--current-url #'yeetube--rss-callback callback-args 'silent 'inhibit-cookies))
-        (url-retrieve yeetube--current-url #'yeetube--rss-callback callback-args 'silent 'inhibit-cookies)))))
+      (yeetube-with-tor-socks
+       (url-retrieve yeetube--current-url #'yeetube--rss-callback
+                     callback-args 'silent 'inhibit-cookies)))))
 
 (defun yeetube--callback (status)
   "Yeetube callback handling STATUS."
@@ -615,10 +624,8 @@ When RSS fails, display FALLBACK-URL with the regular scraper."
   (with-current-buffer (get-buffer-create "*yeetube*")
     (setq-local yeetube--current-url url)
     (let ((url-request-extra-headers yeetube-request-headers))
-      (if yeetube-enable-tor
-          (yeetube-with-tor-socks
-           (url-retrieve url #'yeetube--callback nil 'silent 'inhibit-cookies))
-	(url-retrieve url #'yeetube--callback nil 'silent 'inhibit-cookies)))))
+      (yeetube-with-tor-socks
+       (url-retrieve url #'yeetube--callback nil 'silent 'inhibit-cookies)))))
 
 ;;;###autoload
 (defun yeetube-search (query)
@@ -664,10 +671,9 @@ When RSS fails, display FALLBACK-URL with the regular scraper."
            `((context (client (clientName . "WEB")
                               (clientVersion . ,yeetube--client-version)))
              (continuation . ,token)))))
-    (if yeetube-enable-tor
-        (yeetube-with-tor-socks
-         (url-retrieve endpoint #'yeetube--pagination-callback nil 'silent 'inhibit-cookies))
-      (url-retrieve endpoint #'yeetube--pagination-callback nil 'silent 'inhibit-cookies))))
+    (yeetube-with-tor-socks
+     (url-retrieve endpoint #'yeetube--pagination-callback
+                   nil 'silent 'inhibit-cookies))))
 
 (defun yeetube--pagination-callback (status)
   "Handle pagination response with STATUS."
@@ -675,9 +681,7 @@ When RSS fails, display FALLBACK-URL with the regular scraper."
     (unwind-protect
         (unless (plist-get status :error)
           (let* ((result (with-temp-buffer
-                           (set-buffer-multibyte t)
-                           (url-insert url-buffer)
-                           (decode-coding-region (point-min) (point-max) 'utf-8)
+                           (yeetube--decode-url-buffer url-buffer)
                            (goto-char (point-min))
                            (search-forward "{" nil t)
                            (backward-char)
