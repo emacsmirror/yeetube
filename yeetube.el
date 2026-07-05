@@ -306,6 +306,13 @@ RSS-feed view (see the `yeetube--rss-*' family in this file)."
   "Interactively read a search term."
   (read-string "Yeetube Search: " nil 'yeetube-search-history))
 
+(defun yeetube--display-loading ()
+  "Pop to the results buffer and show a loading indicator."
+  (pop-to-buffer-same-window yeetube--buffer-name)
+  (let ((inhibit-read-only t))
+    (erase-buffer)
+    (insert (propertize "Loading..." 'face 'bold-italic))))
+
 
 ;;; Playback
 
@@ -633,10 +640,7 @@ When RSS fails, display FALLBACK-URL with the regular scraper."
 (defun yeetube-search (query)
   "Search for QUERY."
   (interactive (list (yeetube-read-query)))
-  (pop-to-buffer-same-window yeetube--buffer-name)
-  (let ((inhibit-read-only t))
-    (erase-buffer)
-    (insert (propertize "Loading..." 'face 'bold-italic)))
+  (yeetube--display-loading)
   (yeetube-display-content-from-url
    ;; `ucbcb=1' bypasses EU cookie consent; sent via the Cookie header
    ;; configured in `yeetube-request-headers'.
