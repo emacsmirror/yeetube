@@ -60,6 +60,10 @@
   (unless (and yeetube-mpv-program yeetube-ytdlp-program)
     (error "Unable to play video.  Please install `yt-dlp' and `mpv'")))
 
+(defun yeetube-mpv--idle-p ()
+  "Return non-nil when no mpv process is running."
+  (not (get-process yeetube-mpv--process-name)))
+
 (defun yeetube-mpv-process (command)
   "Start yeetube process for shell COMMAND."
   (yeetube-mpv-check)
