@@ -13,9 +13,9 @@ endif
 
 GUIX_WRAP = $(if $(GUIX_SHELL),$(GUIX_SHELL) $(MAKE) --no-print-directory EMACS_CMD=emacs,$(MAKE) --no-print-directory)
 
-SRCS = yeetube.el yeetube-mpv.el yeetube-ol.el
+SRCS = yeetube.el yeetube-scraper.el yeetube-ui.el yeetube-mpv.el yeetube-download.el yeetube-ol.el
 
-TESTS = test/yeetube-tests.el
+TESTS = test/yeetube-tests.el test/yeetube-scraper-tests.el test/yeetube-ui-tests.el
 
 BATCH = $(EMACS_CMD) -Q --batch -L .
 
