@@ -109,14 +109,13 @@
          (id (car row))
          (vec (cadr row)))
     (should (equal "abc" id))
-    ;; title=0, views=1, duration=2, date=3, channel=4, channel-id=5, type=6
+    ;; title=0, views=1, duration=2, date=3, channel=4
+    (should (= 5 (length vec)))
     (should (string-match-p "Test Title" (aref vec 0)))
     (should (string-match-p "1,000" (aref vec 1)))
     (should (string-match-p "3:00" (aref vec 2)))
     (should (string-match-p "1 day ago" (aref vec 3)))
-    (should (string-match-p "TestCh" (aref vec 4)))
-    (should (equal "/@testch" (aref vec 5)))
-    (should (eq 'video (aref vec 6)))))
+    (should (string-match-p "TestCh" (aref vec 4)))))
 
 (ert-deftest yeetube-ui-test-entry-to-row-video-with-thumbnails ()
   "Plist converts to row with thumbnail placeholder."
@@ -145,48 +144,48 @@
 (ert-deftest yeetube-ui-test-sort-views-with-thumbnails ()
   "Sort by views works when thumbnails are enabled (index 2)."
   (let ((yeetube-display-thumbnails-p t)
-        (a '("id1" ["thumb" "Title A" "1,000" "3:00" "1 day ago" "Ch" "/@ch" video]))
-        (b '("id2" ["thumb" "Title B" "2,000" "5:00" "2 days ago" "Ch" "/@ch" video])))
+        (a '("id1" ["thumb" "Title A" "1,000" "3:00" "1 day ago" "Ch"]))
+        (b '("id2" ["thumb" "Title B" "2,000" "5:00" "2 days ago" "Ch"])))
     (should (yeetube-ui--sort-views a b))
     (should-not (yeetube-ui--sort-views b a))))
 
 (ert-deftest yeetube-ui-test-sort-views-without-thumbnails ()
   "Sort by views works when thumbnails are disabled (index 1)."
   (let ((yeetube-display-thumbnails-p nil)
-        (a '("id1" ["Title A" "1,000" "3:00" "1 day ago" "Ch" "/@ch" video]))
-        (b '("id2" ["Title B" "2,000" "5:00" "2 days ago" "Ch" "/@ch" video])))
+        (a '("id1" ["Title A" "1,000" "3:00" "1 day ago" "Ch"]))
+        (b '("id2" ["Title B" "2,000" "5:00" "2 days ago" "Ch"])))
     (should (yeetube-ui--sort-views a b))
     (should-not (yeetube-ui--sort-views b a))))
 
 (ert-deftest yeetube-ui-test-sort-duration-with-thumbnails ()
   "Sort by duration works when thumbnails are enabled (index 3)."
   (let ((yeetube-display-thumbnails-p t)
-        (a '("id1" ["thumb" "Title A" "100" "1:00" "1 day ago" "Ch" "/@ch" video]))
-        (b '("id2" ["thumb" "Title B" "200" "2:00" "2 days ago" "Ch" "/@ch" video])))
+        (a '("id1" ["thumb" "Title A" "100" "1:00" "1 day ago" "Ch"]))
+        (b '("id2" ["thumb" "Title B" "200" "2:00" "2 days ago" "Ch"])))
     (should (yeetube-ui--sort-duration a b))
     (should-not (yeetube-ui--sort-duration b a))))
 
 (ert-deftest yeetube-ui-test-sort-duration-without-thumbnails ()
   "Sort by duration works when thumbnails are disabled (index 2)."
   (let ((yeetube-display-thumbnails-p nil)
-        (a '("id1" ["Title A" "100" "1:00" "1 day ago" "Ch" "/@ch" video]))
-        (b '("id2" ["Title B" "200" "2:00" "2 days ago" "Ch" "/@ch" video])))
+        (a '("id1" ["Title A" "100" "1:00" "1 day ago" "Ch"]))
+        (b '("id2" ["Title B" "200" "2:00" "2 days ago" "Ch"])))
     (should (yeetube-ui--sort-duration a b))
     (should-not (yeetube-ui--sort-duration b a))))
 
 (ert-deftest yeetube-ui-test-sort-date-with-thumbnails ()
   "Sort by date works when thumbnails are enabled (index 4)."
   (let ((yeetube-display-thumbnails-p t)
-        (a '("id1" ["thumb" "Title A" "100" "1:00" "1 day ago" "Ch" "/@ch" video]))
-        (b '("id2" ["thumb" "Title B" "200" "2:00" "2 days ago" "Ch" "/@ch" video])))
+        (a '("id1" ["thumb" "Title A" "100" "1:00" "1 day ago" "Ch"]))
+        (b '("id2" ["thumb" "Title B" "200" "2:00" "2 days ago" "Ch"])))
     (should (yeetube-ui--sort-date a b))
     (should-not (yeetube-ui--sort-date b a))))
 
 (ert-deftest yeetube-ui-test-sort-date-without-thumbnails ()
   "Sort by date works when thumbnails are disabled (index 3)."
   (let ((yeetube-display-thumbnails-p nil)
-        (a '("id1" ["Title A" "100" "1:00" "1 day ago" "Ch" "/@ch" video]))
-        (b '("id2" ["Title B" "200" "2:00" "2 days ago" "Ch" "/@ch" video])))
+        (a '("id1" ["Title A" "100" "1:00" "1 day ago" "Ch"]))
+        (b '("id2" ["Title B" "200" "2:00" "2 days ago" "Ch"])))
     (should (yeetube-ui--sort-date a b))
     (should-not (yeetube-ui--sort-date b a))))
 
@@ -195,7 +194,7 @@
 (ert-deftest yeetube-ui-test-image-callback-persists-image-on-vector ()
   "yeetube-ui--image-callback stores the image display property on the content vector."
   (let* ((fake-image (list 'image :type 'png :data "fakedata"))
-         (vec (vector "[[test-id.jpg]]" "Title" "100" "1:00" "1 day ago" "Ch" "/@ch" 'video))
+         (vec (vector "[[test-id.jpg]]" "Title" "100" "1:00" "1 day ago" "Ch"))
          (yeetube-content (list (list "test-id" vec)))
          (yeetube-thumbnail-size '(120 . 90)))
     (let ((display-buf (generate-new-buffer " *yeetube-test*")))
@@ -218,7 +217,7 @@
 (ert-deftest yeetube-ui-test-image-callback-displays-image-in-buffer ()
   "yeetube-ui--image-callback places the image in the display buffer."
   (let* ((fake-image (list 'image :type 'png :data "fakedata"))
-         (vec (vector "[[test-id.jpg]]" "Title" "100" "1:00" "1 day ago" "Ch" "/@ch" 'video))
+         (vec (vector "[[test-id.jpg]]" "Title" "100" "1:00" "1 day ago" "Ch"))
          (yeetube-content (list (list "test-id" vec)))
          (yeetube-thumbnail-size '(120 . 90))
          (buf-name " *yeetube-display-test*"))

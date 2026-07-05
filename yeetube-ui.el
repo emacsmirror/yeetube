@@ -43,37 +43,31 @@
   "Faces used by yeetube."
   :group 'yeetube
   :tag "Yeetube Faces"
-  :prefix 'yeetube-face)
+  :prefix "yeetube-face-")
 
 (defface yeetube-face-header-query
   '((t :inherit font-lock-function-name-face))
-  "Face used for the search query header."
-  :group 'yeetube-faces)
+  "Face used for the search query header.")
 
 (defface yeetube-face-duration
   '((t :inherit font-lock-string-face))
-  "Face used for the video duration."
-  :group 'yeetube-faces)
+  "Face used for the video duration.")
 
 (defface yeetube-face-view-count
   '((t :inherit font-lock-keyword-face))
-  "Face used for the video view count."
-  :group 'yeetube-faces)
+  "Face used for the video view count.")
 
 (defface yeetube-face-title
   '((t :inherit font-lock-variable-use-face))
-  "Face used for video title."
-  :group 'yeetube-faces)
+  "Face used for video title.")
 
 (defface yeetube-face-channel
   '((t :inherit font-lock-function-call-face))
-  "Face used for video channel name."
-  :group 'yeetube-faces)
+  "Face used for video channel name.")
 
 (defface yeetube-face-date
   '((t :inherit font-lock-doc-face))
-  "Face used for published date."
-  :group 'yeetube-faces)
+  "Face used for published date.")
 
 
 ;;; View count formatting
@@ -120,9 +114,7 @@ The vector layout depends on `yeetube-display-thumbnails-p'."
          (duration (plist-get entry :duration))
          (date (plist-get entry :date))
          (channel (plist-get entry :channel))
-         (channel-id (plist-get entry :channel-id))
-         (type (plist-get entry :type))
-         (playlistp (eq type 'playlist))
+         (playlistp (eq (plist-get entry :type) 'playlist))
          (title-str (propertize (if playlistp
                                     (concat "Playlist: " title)
                                   title)
@@ -135,7 +127,7 @@ The vector layout depends on `yeetube-display-thumbnails-p'."
          (channel-str (propertize (or channel "")
                                   'face 'yeetube-face-channel))
          (fields (list title-str views-str duration-str
-                       date-str channel-str channel-id type)))
+                       date-str channel-str)))
     (list id (if yeetube-display-thumbnails-p
                  (apply #'vector (format "[[%s.jpg]]" id) fields)
                (apply #'vector fields)))))
