@@ -478,14 +478,15 @@ Optionally, provide custom own URL."
 (defun yeetube--rss-entry-text (entry tag)
   "Return text for direct child TAG in RSS ENTRY, or an empty string."
   (or (when-let* ((node (dom-child-by-tag entry tag)))
-        (string-trim (dom-inner-text node)))
+        ;; Not `dom-inner-text', which is new in Emacs 31.
+        (string-trim (dom-texts node "")))
       ""))
 
 (defun yeetube--rss-author-name (entry)
   "Return author name from RSS ENTRY, or an empty string."
   (or (when-let* ((author (dom-child-by-tag entry 'author))
                   (name (dom-child-by-tag author 'name)))
-        (string-trim (dom-inner-text name)))
+        (string-trim (dom-texts name "")))
       ""))
 
 (defun yeetube--rss-channel-path (browse-id)
