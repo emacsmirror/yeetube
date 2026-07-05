@@ -1,17 +1,15 @@
 .POSIX:
 
-ifndef EMACS_CMD
-GUIX := $(shell command -v guix 2>/dev/null)
-ifdef GUIX
-GUIX_SHELL := guix shell --pure -D -f guix.scm emacs-next --
-EMACS_CMD := $(GUIX_SHELL) emacs
-else
-GUIX_SHELL :=
-EMACS_CMD := emacs
+NIX := $(shell command -v nix 2>/dev/null)
+
+ENV_MAKE = $(MAKE) --no-print-directory
+ifeq ($(YEETUBE_ENV_WRAPPED),)
+ifneq ($(NIX),)
+ENV_MAKE = nix develop path:$(CURDIR) --command env YEETUBE_ENV_WRAPPED=1 $(MAKE) --no-print-directory
 endif
 endif
 
-GUIX_WRAP = $(if $(GUIX_SHELL),$(GUIX_SHELL) $(MAKE) --no-print-directory EMACS_CMD=emacs,$(MAKE) --no-print-directory)
+EMACS_CMD ?= emacs
 
 SRCS = yeetube.el yeetube-scraper.el yeetube-ui.el yeetube-mpv.el yeetube-download.el yeetube-ol.el
 
@@ -24,7 +22,7 @@ BATCH = $(EMACS_CMD) -Q --batch -L .
 all: compile
 
 compile:
-	@$(GUIX_WRAP) do-compile
+	@$(ENV_MAKE) do-compile
 
 do-compile:
 	@for f in $(SRCS); do \
@@ -33,7 +31,7 @@ do-compile:
 	done
 
 test:
-	@$(GUIX_WRAP) do-test
+	@$(ENV_MAKE) do-test
 
 do-test:
 	@for f in $(TESTS); do \
@@ -42,7 +40,7 @@ do-test:
 	done
 
 lint:
-	@$(GUIX_WRAP) do-lint
+	@$(ENV_MAKE) do-lint
 
 do-lint:
 	@echo "Running checkdoc..."
