@@ -55,7 +55,7 @@ dev: compile lint test
 load: clean
 	@emacsclient --eval "(progn \
 	  (add-to-list 'load-path \"$(CURDIR)\") \
-	  (dolist (sym '(yeetube-mode-map)) \
+	  (dolist (sym '(yeetube-mode-map yeetube-settings-map)) \
 	    (when (boundp sym) (makunbound sym))))" > /dev/null
 	@for f in $(SRCS); do \
 	  emacsclient --eval "(load-file \"$(CURDIR)/$$f\")" > /dev/null || \
