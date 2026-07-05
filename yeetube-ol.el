@@ -1,8 +1,10 @@
 ;;; yeetube-ol.el --- Yeetube org-link integration.  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2025  Steven Allen
+;; Copyright (C) 2026  Thanos Apollo
 
 ;; Author: Steven Allen <steven@stebalien.com>
+;; Maintainer: Thanos Apollo <public@thanosapollo.org>
 ;; Keywords: extensions youtube videos org
 ;; URL: https://git.thanosapollo.org/yeetube
 
@@ -21,21 +23,29 @@
 
 ;;; Commentary:
 
-;; This package is an org-link integration for yeetube.
+;; Org-link types `yt-video:' and `yt-playlist:' for storing,
+;; following, and exporting links to yeetube entries.
+;;
+;; Format: yt-video:VIDEO-ID and yt-playlist:PLAYLIST-ID
+;; Example: [[yt-video:dQw4w9WgXcQ][Some video]]
+;;
+;; The link types are registered when this file is loaded.  To
+;; activate, add to your init:
+;;
+;;   (with-eval-after-load 'org (require 'yeetube-ol))
 
 ;;; Code:
 
-(require 'yeetube)
 (require 'ol)
-(require 'ox)
+(require 'tabulated-list)
+(require 'yeetube)
 
-(declare-function yeetube--find-item "yeetube")
+;;; Helpers
 
-(defsubst yeetube-ol--store-link (type)
-  "Create an Org link to current Yeetube item of TYPE.
-TYPE must be either `video' or `playlist'.
-This function does nothing if the current major mode is not `yeetube-mode'
-and/or the item at point is not of type TYPE."
+(defun yeetube-ol--store-link (type)
+  "Store an Org link to the current yeetube item of TYPE.
+TYPE is `video' or `playlist'.  Does nothing unless the current
+buffer is in `yeetube-mode' and the item at point matches TYPE."
   (when (derived-mode-p 'yeetube-mode)
     (let* ((id (or (tabulated-list-get-id)
                    (save-excursion (end-of-line) (tabulated-list-get-id))))
@@ -46,66 +56,54 @@ and/or the item at point is not of type TYPE."
                               :link (format "yt-%S:%s" type id)
                               :description title)))))
 
-(defun yeetube-ol--export-link-with-backend (backend info link &optional desc)
-  "Helper function for exporting links with another backend.
-Uses BACKEND to export a link with path LINK and description DESC.
-The INFO is passed along to the export backend."
-  (org-export-with-backend
-   backend
-   (car (org-element-parse-secondary-string
-         (org-link-make-string link desc) '(link)))
-   desc info))
+(defun yeetube-ol--export (url desc backend)
+  "Export URL with description DESC to BACKEND.
+DESC falls back to URL when nil."
+  (let ((desc (or desc url)))
+    (pcase backend
+      ('html (format "<a href=\"%s\">%s</a>" url desc))
+      ('md (format "[%s](%s)" desc url))
+      ('latex (format "\\href{%s}{%s}" url desc))
+      (_ desc))))
 
-;;;###autoload
-(defun yeetube-ol--store-video-link (&optional _interactive)
-  "Store an Org link to the current Yeetube video."
+;;; Store / follow / export
+
+(defun yeetube-ol-store-video-link (&optional _interactive)
+  "Store an Org link to the yeetube video at point."
   (yeetube-ol--store-link 'video))
 
-;;;###autoload
-(defun yeetube-ol--export-video-link (path desc backend info)
-  "Export a Yeetube video link for Org export.
-PATH is the video ID, DESC is the link description.
-BACKEND is the export backend being used and INFO is the export plist."
-  (yeetube-ol--export-link-with-backend backend info (concat yeetube-video-url path) desc))
-
-;;;###autoload
-(defun yeetube-ol--follow-video-link (path _arg)
-  "Open a Yeetube video link specified by PATH."
+(defun yeetube-ol-follow-video (path _prefix)
+  "Play the yeetube video with id PATH."
   (funcall yeetube-play-function (concat yeetube-video-url path)))
 
-;;;###autoload
-(defun yeetube-ol--store-playlist-link (&optional _interactive)
-  "Store an Org link to the current Yeetube playlist."
+(defun yeetube-ol-export-video (path desc backend _channel)
+  "Export a yt-video: link to BACKEND.
+PATH is the video id; DESC the user-visible label."
+  (yeetube-ol--export (concat yeetube-video-url path) desc backend))
+
+(defun yeetube-ol-store-playlist-link (&optional _interactive)
+  "Store an Org link to the yeetube playlist at point."
   (yeetube-ol--store-link 'playlist))
 
-;;;###autoload
-(defun yeetube-ol--export-playlist-link (path desc backend info)
-  "Export a Yeetube playlist link for Org export.
-PATH is the playlist ID, DESC is the link description.
-BACKEND is the export backend being used and INFO is the export plist."
-  (yeetube-ol--export-link-with-backend backend info (concat yeetube-playlist-url path) desc))
-
-;;;###autoload
-(defun yeetube-ol--follow-playlist-link (path _arg)
-  "Open a Yeetube playlist link specified by PATH."
-  (pop-to-buffer-same-window "*yeetube*")
-  (let ((inhibit-read-only t))
-    (erase-buffer)
-    (insert (propertize "Loading..." 'face 'bold-italic)))
+(defun yeetube-ol-follow-playlist (path _prefix)
+  "Display the yeetube playlist with id PATH."
+  (yeetube--display-loading)
   (yeetube-display-content-from-url (concat yeetube-playlist-url path)))
 
-;;;###autoload
-(with-eval-after-load 'ol
-  (org-link-set-parameters
-   "yt-video"
-   :store #'yeetube-ol--store-video-link
-   :export #'yeetube-ol--export-video-link
-   :follow #'yeetube-ol--follow-video-link)
-  (org-link-set-parameters
-   "yt-playlist"
-   :store #'yeetube-ol--store-playlist-link
-   :export #'yeetube-ol--export-playlist-link
-   :follow #'yeetube-ol--follow-playlist-link))
+(defun yeetube-ol-export-playlist (path desc backend _channel)
+  "Export a yt-playlist: link to BACKEND.
+PATH is the playlist id; DESC the user-visible label."
+  (yeetube-ol--export (concat yeetube-playlist-url path) desc backend))
+
+(org-link-set-parameters "yt-video"
+                         :store #'yeetube-ol-store-video-link
+                         :follow #'yeetube-ol-follow-video
+                         :export #'yeetube-ol-export-video)
+
+(org-link-set-parameters "yt-playlist"
+                         :store #'yeetube-ol-store-playlist-link
+                         :follow #'yeetube-ol-follow-playlist
+                         :export #'yeetube-ol-export-playlist)
 
 (provide 'yeetube-ol)
 ;;; yeetube-ol.el ends here
