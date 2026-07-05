@@ -788,14 +788,14 @@ When RSS fails, display FALLBACK-URL with the regular scraper."
   "Yeetube settings menu."
   :description "Yeetube Settings"
   :group "Session"
-  "n" ((lambda () (yeetube--setting-desc
+  "l" ((lambda () (yeetube--setting-desc
                    "Results limit" (or yeetube--results-limit
                                        yeetube-results-limit)))
        yeetube-set-results-limit :stay-open t)
-  "Q" ((lambda () (yeetube--setting-desc
+  "v" ((lambda () (yeetube--setting-desc
                    "Video quality" (or yeetube-mpv-video-quality "default")))
        yeetube-set-video-quality :stay-open t)
-  "D" ((lambda () (yeetube--setting-desc
+  "d" ((lambda () (yeetube--setting-desc
                    "Download dir" (or yeetube--download-directory
                                       yeetube-download-directory)))
        yeetube-set-download-directory :stay-open t)
@@ -803,8 +803,8 @@ When RSS fails, display FALLBACK-URL with the regular scraper."
                    "Audio format" (or yeetube--audio-format "none")))
        yeetube-set-audio-format :stay-open t)
   :group "Switches"
-  "V" ("No video" :switch yeetube-mpv-no-video)
-  "T" ("Torsocks" :switch yeetube-mpv-enable-torsocks))
+  "n" ("No video" :switch yeetube-mpv-no-video)
+  "t" ("Torsocks" :switch yeetube-mpv-enable-torsocks))
 
 (keymap-popup-define yeetube-mode-map
   "Yeetube Mode Map"
