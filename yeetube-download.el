@@ -41,7 +41,7 @@ Optional values:
  NAME for custom file name.
  AUDIO-FORMAT to extract and keep contents as specified audio-format only."
   (unless yeetube-ytdlp-program
-    (error "Executable for yt-dlp not found. Please set yeetube-ytdlp-program"))
+    (error "Executable for yt-dlp not found.  Please set `yeetube-ytdlp-program'"))
   (let* ((tor-command (when yeetube-enable-tor yeetube-torsocks-program))
          (name-command (when name (format "-o %s" (shell-quote-argument name))))
          (format-command (when audio-format

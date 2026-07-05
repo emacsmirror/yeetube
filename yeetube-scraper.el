@@ -25,9 +25,9 @@
 (require 'subr-x)
 
 (defun yeetube-scraper--text-from-object (obj)
-  "Return text from OBJ, which may be a `simpleText' or `runs' wrapper.
+  "Return text from OBJ, a \"simpleText\" string or segment-array wrapper.
 YouTube returns text fields in two forms depending on layout: a
-single `simpleText' string, or a `runs' array of segments to be
+single \"simpleText\" string, or a \"runs\" array of segments to be
 concatenated.  Returns nil when neither shape is present."
   (cond ((null obj) nil)
         ((alist-get 'simpleText obj))
@@ -36,10 +36,11 @@ concatenated.  Returns nil when neither shape is present."
                     (alist-get 'runs obj)))))
 
 (defun yeetube-scraper--byline-runs (renderer)
-  "Return the first non-empty runs list among the byline candidates.
-Mirrors the fallback chain YouTube uses across layouts:
-`longBylineText' (search/channel pages), `ownerText' (some
-playlist views), `shortBylineText' (compact contexts)."
+  "Return RENDERER's first non-empty byline segment list.
+Each candidate holds a \"runs\" array; mirrors the fallback chain
+YouTube uses across layouts: \"longBylineText\" (search/channel
+pages), \"ownerText\" (some playlist views), \"shortBylineText\"
+\(compact contexts)."
   (cl-some (lambda (key)
              (alist-get 'runs (alist-get key renderer)))
            '(longBylineText ownerText shortBylineText)))
