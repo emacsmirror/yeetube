@@ -24,7 +24,8 @@ Core features include:
 - Executing queries on YouTube
 - Playing & Downloading video(s)
 - Pagination for loading more results
-- Transient menus for quick access to all commands
+- Popup menus for quick access to all commands, via [[https://elpa.gnu.org/packages/keymap-popup.html][keymap-popup]]
+- Org-link integration for videos & playlists
 - A standalone, minimalist yt-dlp wrapper
 
 /This package does not use Invidious or YouTube's API, just parses
@@ -66,9 +67,11 @@ $ sudo apt install mpv yt-dlp
 - =M-x yeetube-search= to search directly
 - In the results buffer, press =h= to see all available keybindings
 
-Settings like video quality, torsocks and results limit can be
-toggled per-buffer directly from the popup (=h=).  They show their
-current value inline.
+Settings like results limit, video quality, download directory and
+audio format live in a settings submenu: press =o= (in the results
+buffer or inside the popup) to enter it.  Each entry shows its
+current per-buffer value inline and the menu stays open while you
+adjust values; =q= returns to the main popup.
 
 ** Configuration
 :PROPERTIES:
@@ -125,9 +128,9 @@ By default, yeetube fetches 20 results per search.  You can change this:
 (setf yeetube-results-limit 50)
 #+end_src
 
-You can also change it per-buffer via the popup menu (=h= then =n=).
-When the limit exceeds results on one page, additional pages are
-fetched automatically.
+You can also change it per-buffer via the settings submenu (=o= then
+=l=).  When the limit exceeds results on one page, additional pages
+are fetched automatically.
 
 *** Tor & torsocks support
 :PROPERTIES:
@@ -139,10 +142,33 @@ For enhanced privacy, using tor & torsocks:
 (setf yeetube-enable-tor t)
 #+end_src
 
-You can also toggle torsocks for mpv per-buffer from the popup
-menu (=h= then =T=).
+You can also toggle torsocks for mpv per-buffer from the settings
+submenu (=o= then =t=).
 
 It's recommended to disable thumbnail support to improve performance
 when using tor.
 
 Yeetube is configured to use tor via port 9050.
+
+*** Org links
+:PROPERTIES:
+:CUSTOM_ID: org-links
+:END:
+The optional =yeetube-ol= module adds the =yt-video:= and
+=yt-playlist:= org-link types: store a link to the entry at point
+with =org-store-link=, follow it to play the video (or open the
+playlist), and export it as a regular YouTube URL.  To activate:
+
+#+begin_src emacs-lisp
+(with-eval-after-load 'org (require 'yeetube-ol))
+#+end_src
+
+** Development
+:PROPERTIES:
+:CUSTOM_ID: development
+:END:
+The repository ships a Nix flake providing Emacs with all
+dependencies.  =make compile=, =make test= and =make lint= re-enter
+themselves through =nix develop= when =nix= is available; =make dev=
+runs all three.  =nix flake check= runs the test suite as a Nix
+check.
