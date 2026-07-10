@@ -611,21 +611,45 @@ When RSS fails, display FALLBACK-URL with the regular scraper."
        (url-retrieve yeetube--current-url #'yeetube--rss-callback
                      callback-args 'silent 'inhibit-cookies)))))
 
+(defconst yeetube--parse-error-message "Could not parse YouTube response"
+  "Message shown when the YouTube response cannot be parsed.")
+
+(defun yeetube--show-parse-error (&optional detail)
+  "Report a scraper parse failure to the user.
+Clear the loading indicator from the *yeetube* buffer and emit a
+user-visible message.  DETAIL is an optional diagnostic string."
+  (when-let* ((buf (get-buffer yeetube--buffer-name)))
+    (with-current-buffer buf
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (insert yeetube--parse-error-message))))
+  (if detail
+      (message "%s: %s" yeetube--parse-error-message detail)
+    (message "%s" yeetube--parse-error-message)))
+
 (defun yeetube--callback (status)
   "Yeetube callback handling STATUS."
   (let ((url-buffer (current-buffer)))
     (unwind-protect
         (unless (plist-get status :error)
           (let* ((limit (yeetube--current-limit))
-                 (result (with-temp-buffer
-                           (yeetube--decode-url-buffer url-buffer)
-                           (yeetube-scraper-parse)))
-                 (items (plist-get result :items))
-                 (continuation (plist-get result :continuation)))
-            (when items
-              (yeetube--render-items items limit continuation)
-              (when (and continuation (length< items limit))
-                (yeetube--auto-paginate limit)))))
+                 (result (condition-case err
+                             (with-temp-buffer
+                               (yeetube--decode-url-buffer url-buffer)
+                               (yeetube-scraper-parse))
+                           (error
+                            (yeetube--show-parse-error
+                             (error-message-string err))
+                            nil))))
+            (when result
+              (let ((items (plist-get result :items))
+                    (continuation (plist-get result :continuation)))
+                (if items
+                    (progn
+                      (yeetube--render-items items limit continuation)
+                      (when (and continuation (length< items limit))
+                        (yeetube--auto-paginate limit)))
+                  (yeetube--show-parse-error))))))
       (kill-buffer url-buffer))))
 
 (defun yeetube-display-content-from-url (url)
@@ -686,27 +710,34 @@ When RSS fails, display FALLBACK-URL with the regular scraper."
   (let ((url-buffer (current-buffer)))
     (unwind-protect
         (unless (plist-get status :error)
-          (let* ((result (with-temp-buffer
-                           (yeetube--decode-url-buffer url-buffer)
-                           (goto-char (point-min))
-                           (search-forward "{" nil t)
-                           (backward-char)
-                           (yeetube-scraper-parse-continuation-response
-                            (json-parse-buffer :object-type 'alist
-                                               :array-type 'list))))
-                 (items (plist-get result :items))
-                 (continuation (plist-get result :continuation)))
-            (when items
-              (with-current-buffer yeetube--buffer-name
-                (setq yeetube-items (append yeetube-items items))
-                (setq-local yeetube--continuation continuation)
-                (yeetube-ui-append items)
-                (yeetube-ui-fetch-thumbnails items yeetube--buffer-name)
-                (when (and continuation
-                           (length< yeetube-items
-                                    (or yeetube--results-limit yeetube-results-limit)))
-                  (yeetube--auto-paginate
-                   (or yeetube--results-limit yeetube-results-limit)))))))
+          (let* ((result (condition-case err
+                             (with-temp-buffer
+                               (yeetube--decode-url-buffer url-buffer)
+                               (goto-char (point-min))
+                               (search-forward "{" nil t)
+                               (backward-char)
+                               (yeetube-scraper-parse-continuation-response
+                                (json-parse-buffer :object-type 'alist
+                                                   :array-type 'list)))
+                           (error
+                            (message "%s: %s"
+                                     yeetube--parse-error-message
+                                     (error-message-string err))
+                            nil))))
+            (when result
+              (let ((items (plist-get result :items))
+                    (continuation (plist-get result :continuation)))
+                (when items
+                  (with-current-buffer yeetube--buffer-name
+                    (setq yeetube-items (append yeetube-items items))
+                    (setq-local yeetube--continuation continuation)
+                    (yeetube-ui-append items)
+                    (yeetube-ui-fetch-thumbnails items yeetube--buffer-name)
+                    (when (and continuation
+                               (length< yeetube-items
+                                        (or yeetube--results-limit yeetube-results-limit)))
+                      (yeetube--auto-paginate
+                       (or yeetube--results-limit yeetube-results-limit)))))))))
       (kill-buffer url-buffer))))
 
 

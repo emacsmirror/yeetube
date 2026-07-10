@@ -382,5 +382,75 @@
       (yeetube-mode)
       (should (string= " " truncate-string-ellipsis)))))
 
+;;; Group 13: yeetube--callback / pagination parse failure handling
+
+(defmacro yeetube-test--with-loading-buffer (&rest body)
+  "Set up the *yeetube* buffer in loading state, run BODY, clean up.
+The *yeetube* buffer is killed afterwards even on non-local exit."
+  (declare (indent 0) (debug (body)))
+  `(unwind-protect
+       (progn
+         (with-current-buffer (get-buffer-create yeetube--buffer-name)
+           (let ((inhibit-read-only t))
+             (erase-buffer)
+             (insert (propertize "Loading..." 'face 'bold-italic))))
+         ,@body)
+     (when (get-buffer yeetube--buffer-name)
+       (kill-buffer yeetube--buffer-name))))
+
+(defun yeetube-test--call-callback (contents &optional callback)
+  "Call CALLBACK with a url buffer containing CONTENTS.
+CALLBACK defaults to `yeetube--callback'.  The *yeetube* buffer
+must already be in the loading state (use
+`yeetube-test--with-loading-buffer').  Return the captured message
+string (or nil).  The url buffer is cleaned up; the caller owns
+the *yeetube* buffer."
+  (let* ((url-buffer (generate-new-buffer " *yeetube-url-test*"))
+         (captured-message nil)
+         (callback (or callback #'yeetube--callback)))
+    (unwind-protect
+        (progn
+          (with-current-buffer url-buffer
+            (insert contents))
+          (cl-letf (((symbol-function 'message)
+                     (lambda (format-string &rest args)
+                       (setq captured-message
+                             (apply #'format format-string args)))))
+            (with-current-buffer url-buffer
+              (funcall callback nil)))
+          captured-message)
+      (when (buffer-live-p url-buffer)
+        (kill-buffer url-buffer)))))
+
+(ert-deftest yeetube-test-callback-parse-failure-notifies-user ()
+  "Consent wall (no ytInitialData) does not leave buffer on Loading."
+  (yeetube-test--with-loading-buffer
+   (let ((msg (yeetube-test--call-callback
+               "<html><body>consent or login wall</body></html>")))
+     (should msg)
+     (should (string-match-p "Could not parse YouTube response" msg))
+     (with-current-buffer yeetube--buffer-name
+       (should-not (string-match-p "Loading"
+                                   (buffer-string)))))))
+
+(ert-deftest yeetube-test-callback-empty-response-notifies-user ()
+  "Empty response body does not leave buffer on Loading."
+  (yeetube-test--with-loading-buffer
+   (let ((msg (yeetube-test--call-callback "")))
+     (should msg)
+     (should (string-match-p "Could not parse YouTube response" msg))
+     (with-current-buffer yeetube--buffer-name
+       (should-not (string-match-p "Loading"
+                                   (buffer-string)))))))
+
+(ert-deftest yeetube-test-pagination-parse-failure-notifies-user ()
+  "Malformed pagination response does not crash the callback."
+  (yeetube-test--with-loading-buffer
+   (let ((msg (yeetube-test--call-callback
+               "not-json-at-all"
+               #'yeetube--pagination-callback)))
+     (should msg)
+     (should (string-match-p "Could not parse YouTube response" msg)))))
+
 (provide 'yeetube-tests)
 ;;; yeetube-tests.el ends here
