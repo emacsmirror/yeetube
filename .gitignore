@@ -13,3 +13,8 @@
 refs/*
 
 !AGENTS.md
+
+# Forgejo metadata (issue templates, PR templates) must override the broad
+# ".*" rule above so it can be tracked in git.
+!.forgejo
+!.forgejo/**

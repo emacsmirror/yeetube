@@ -1,0 +1,104 @@
+name: Issue
+about: Report a bug, request a feature, or suggest an improvement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to open an issue!
+
+        Please fill in the relevant sections below. Optional sections can be
+        left blank and will be omitted from the submitted issue.
+  - type: dropdown
+    id: category
+    attributes:
+      label: Category
+      description: What kind of issue is this?
+      options:
+        - Bug
+        - Enhancement
+        - Maintenance
+        - Question
+    validations:
+      required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: A concise one or two sentence description of the issue or request.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence / current behavior
+      description: |
+        Describe what currently happens. For bugs, cite the relevant files,
+        functions, or commands. Screenshots or log snippets help.
+      render: shell
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Minimal steps to reproduce the behavior, if applicable.
+      placeholder: |
+        1. M-x yeetube ...
+        2. ...
+        3. ...
+    validations:
+      required: false
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected outcome
+      description: What you expected to happen instead.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Testable conditions that would confirm the issue is resolved.
+    validations:
+      required: false
+  - type: textarea
+    id: implementation-notes
+    attributes:
+      label: Implementation notes and non-goals
+      description: |
+        Suggested approach, relevant functions, and what should explicitly
+        not change as part of this issue.
+    validations:
+      required: false
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification
+      description: |
+        Commands or tests that exercise the relevant behavior.
+      placeholder: |
+        make dev
+        # or
+        nix flake check
+      render: shell
+    validations:
+      required: false
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: |
+        Emacs version, YeeTube version or commit, operating system, and
+        relevant external tools (mpv, yt-dlp, torsocks).
+      placeholder: "Emacs 30.1, YeeTube 2.3.1 (04eee9f), Debian, mpv 0.39, yt-dlp 2025.x"
+    validations:
+      required: true
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility, risk, and dependencies
+      description: |
+        Any breaking changes, new dependencies, or platform-specific concerns.
+    validations:
+      required: false
