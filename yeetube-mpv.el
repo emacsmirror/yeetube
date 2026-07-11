@@ -64,13 +64,21 @@
   "Return non-nil when no mpv process is running."
   (not (get-process yeetube-mpv--process-name)))
 
+(defun yeetube-mpv--sentinel (proc _event)
+  "Clear modeline state when mpv process PROC exits."
+  (when (memq (process-status proc) '(exit signal))
+    (setq yeetube-mpv-currently-playing nil)
+    (force-mode-line-update)))
+
 (defun yeetube-mpv-process (command)
   "Start yeetube process for shell COMMAND."
   (yeetube-mpv-check)
   (when-let* ((old (get-process yeetube-mpv--process-name)))
     (delete-process old))
-  (start-process-shell-command
-   yeetube-mpv--process-name "*yeetube-mpv-output*" command))
+  (let ((proc (start-process-shell-command
+               yeetube-mpv--process-name "*yeetube-mpv-output*" command)))
+    (set-process-sentinel proc #'yeetube-mpv--sentinel)
+    proc))
 
 (defun yeetube-mpv-ytdl-format-video-quality (resolution)
   "Return shell quoted argument for ytdlp with RESOLUTION."

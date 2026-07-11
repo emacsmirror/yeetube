@@ -131,6 +131,32 @@
                          yeetube-saved-videos)))
       (delete-directory temp-dir t))))
 
+;;; Group 7b: yeetube-load-saved-videos tolerates corrupt files
+
+(ert-deftest yeetube-test-load-saved-videos-empty-file ()
+  "An empty bookmark file yields nil without signaling."
+  (let* ((temp-dir (make-temp-file "yeetube-test" t))
+         (user-emacs-directory (file-name-as-directory temp-dir))
+         (yeetube-saved-videos nil))
+    (unwind-protect
+        (progn
+          (write-region "" nil (locate-user-emacs-file "yeetube"))
+          (yeetube-load-saved-videos)
+          (should (null yeetube-saved-videos)))
+      (delete-directory temp-dir t))))
+
+(ert-deftest yeetube-test-load-saved-videos-corrupt-file ()
+  "A malformed bookmark file yields nil without signaling."
+  (let* ((temp-dir (make-temp-file "yeetube-test" t))
+         (user-emacs-directory (file-name-as-directory temp-dir))
+         (yeetube-saved-videos nil))
+    (unwind-protect
+        (progn
+          (write-region "((not valid" nil (locate-user-emacs-file "yeetube"))
+          (yeetube-load-saved-videos)
+          (should (null yeetube-saved-videos)))
+      (delete-directory temp-dir t))))
+
 ;;; Group 8: yeetube-mode-map keybindings
 
 (ert-deftest yeetube-test-keymap-s-bound-to-search ()
@@ -381,6 +407,104 @@
     (with-temp-buffer
       (yeetube-mode)
       (should (string= " " truncate-string-ellipsis)))))
+
+;;; Group 12b: yeetube-next-page guards empty continuation :url
+
+(ert-deftest yeetube-test-next-page-empty-url-signals-user-error ()
+  "Empty continuation :url signals user-error instead of hitting homepage.
+Regression: when the scraper extracts an empty :url, pagination
+must not POST to https://www.youtube.com (the homepage)."
+  (let ((retrieved-url nil))
+    (cl-letf (((symbol-function 'url-retrieve)
+               (lambda (url &rest _)
+                 (setq retrieved-url url)
+                 (lambda (&rest _)))))
+      (with-temp-buffer
+        (setq-local yeetube--continuation '(:token "abc" :url ""))
+        (should-error (yeetube-next-page) :type 'user-error)
+        (should-not retrieved-url)))))
+
+(ert-deftest yeetube-test-next-page-nil-url-signals-user-error ()
+  "Nil continuation :url signals user-error instead of hitting homepage."
+  (let ((retrieved-url nil))
+    (cl-letf (((symbol-function 'url-retrieve)
+               (lambda (url &rest _)
+                 (setq retrieved-url url)
+                 (lambda (&rest _)))))
+      (with-temp-buffer
+        (setq-local yeetube--continuation '(:token "abc" :url nil))
+        (should-error (yeetube-next-page) :type 'user-error)
+        (should-not retrieved-url)))))
+
+;;; Group 13: yeetube--callback / pagination parse failure handling
+
+(defmacro yeetube-test--with-loading-buffer (&rest body)
+  "Set up the *yeetube* buffer in loading state, run BODY, clean up.
+The *yeetube* buffer is killed afterwards even on non-local exit."
+  (declare (indent 0) (debug (body)))
+  `(unwind-protect
+       (progn
+         (with-current-buffer (get-buffer-create yeetube--buffer-name)
+           (let ((inhibit-read-only t))
+             (erase-buffer)
+             (insert (propertize "Loading..." 'face 'bold-italic))))
+         ,@body)
+     (when (get-buffer yeetube--buffer-name)
+       (kill-buffer yeetube--buffer-name))))
+
+(defun yeetube-test--call-callback (contents &optional callback)
+  "Call CALLBACK with a url buffer containing CONTENTS.
+CALLBACK defaults to `yeetube--callback'.  The *yeetube* buffer
+must already be in the loading state (use
+`yeetube-test--with-loading-buffer').  Return the captured message
+string (or nil).  The url buffer is cleaned up; the caller owns
+the *yeetube* buffer."
+  (let* ((url-buffer (generate-new-buffer " *yeetube-url-test*"))
+         (captured-message nil)
+         (callback (or callback #'yeetube--callback)))
+    (unwind-protect
+        (progn
+          (with-current-buffer url-buffer
+            (insert contents))
+          (cl-letf (((symbol-function 'message)
+                     (lambda (format-string &rest args)
+                       (setq captured-message
+                             (apply #'format format-string args)))))
+            (with-current-buffer url-buffer
+              (funcall callback nil)))
+          captured-message)
+      (when (buffer-live-p url-buffer)
+        (kill-buffer url-buffer)))))
+
+(ert-deftest yeetube-test-callback-parse-failure-notifies-user ()
+  "Consent wall (no ytInitialData) does not leave buffer on Loading."
+  (yeetube-test--with-loading-buffer
+   (let ((msg (yeetube-test--call-callback
+               "<html><body>consent or login wall</body></html>")))
+     (should msg)
+     (should (string-match-p "Could not parse YouTube response" msg))
+     (with-current-buffer yeetube--buffer-name
+       (should-not (string-match-p "Loading"
+                                   (buffer-string)))))))
+
+(ert-deftest yeetube-test-callback-empty-response-notifies-user ()
+  "Empty response body does not leave buffer on Loading."
+  (yeetube-test--with-loading-buffer
+   (let ((msg (yeetube-test--call-callback "")))
+     (should msg)
+     (should (string-match-p "Could not parse YouTube response" msg))
+     (with-current-buffer yeetube--buffer-name
+       (should-not (string-match-p "Loading"
+                                   (buffer-string)))))))
+
+(ert-deftest yeetube-test-pagination-parse-failure-notifies-user ()
+  "Malformed pagination response does not crash the callback."
+  (yeetube-test--with-loading-buffer
+   (let ((msg (yeetube-test--call-callback
+               "not-json-at-all"
+               #'yeetube--pagination-callback)))
+     (should msg)
+     (should (string-match-p "Could not parse YouTube response" msg)))))
 
 (provide 'yeetube-tests)
 ;;; yeetube-tests.el ends here
