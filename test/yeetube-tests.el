@@ -408,6 +408,34 @@
       (yeetube-mode)
       (should (string= " " truncate-string-ellipsis)))))
 
+;;; Group 12b: yeetube-next-page guards empty continuation :url
+
+(ert-deftest yeetube-test-next-page-empty-url-signals-user-error ()
+  "Empty continuation :url signals user-error instead of hitting homepage.
+Regression: when the scraper extracts an empty :url, pagination
+must not POST to https://www.youtube.com (the homepage)."
+  (let ((retrieved-url nil))
+    (cl-letf (((symbol-function 'url-retrieve)
+               (lambda (url &rest _)
+                 (setq retrieved-url url)
+                 (lambda (&rest _)))))
+      (with-temp-buffer
+        (setq-local yeetube--continuation '(:token "abc" :url ""))
+        (should-error (yeetube-next-page) :type 'user-error)
+        (should-not retrieved-url)))))
+
+(ert-deftest yeetube-test-next-page-nil-url-signals-user-error ()
+  "Nil continuation :url signals user-error instead of hitting homepage."
+  (let ((retrieved-url nil))
+    (cl-letf (((symbol-function 'url-retrieve)
+               (lambda (url &rest _)
+                 (setq retrieved-url url)
+                 (lambda (&rest _)))))
+      (with-temp-buffer
+        (setq-local yeetube--continuation '(:token "abc" :url nil))
+        (should-error (yeetube-next-page) :type 'user-error)
+        (should-not retrieved-url)))))
+
 ;;; Group 13: yeetube--callback / pagination parse failure handling
 
 (defmacro yeetube-test--with-loading-buffer (&rest body)

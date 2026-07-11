@@ -696,6 +696,10 @@ user-visible message.  DETAIL is an optional diagnostic string."
   (interactive)
   (unless yeetube--continuation
     (user-error "No more results"))
+  (let ((api-path (plist-get yeetube--continuation :url)))
+    (when (or (null api-path) (string-empty-p api-path))
+      (setq-local yeetube--continuation nil)
+      (user-error "Could not determine next page")))
   (let* ((token (plist-get yeetube--continuation :token))
          (api-path (plist-get yeetube--continuation :url))
          (endpoint (concat "https://www.youtube.com" api-path))
