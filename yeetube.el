@@ -386,14 +386,21 @@ Select entry title from `yeetube-history' and play corresponding URL."
 ;;; Bookmarks
 
 (defun yeetube-load-saved-videos ()
-  "Load saved videos."
+  "Load saved videos.
+If the bookmark file is empty or unreadable, reset
+`yeetube-saved-videos' to nil and emit a warning."
   (let ((file-path (locate-user-emacs-file "yeetube")))
     (if (file-exists-p file-path)
 	(with-temp-buffer
 	  (insert-file-contents file-path)
 	  (goto-char (point-min))
-	  (let ((contents (read (current-buffer))))
-	    (setf yeetube-saved-videos contents)))
+	  (setf yeetube-saved-videos
+		(condition-case nil
+		    (read (current-buffer))
+		  (error
+		   (display-warning
+		    'yeetube "Bookmark file unreadable; resetting saved videos")
+		   nil))))
       (write-region "nil" nil file-path))))
 
 ;;;###autoload

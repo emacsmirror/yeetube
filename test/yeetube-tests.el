@@ -131,6 +131,32 @@
                          yeetube-saved-videos)))
       (delete-directory temp-dir t))))
 
+;;; Group 7b: yeetube-load-saved-videos tolerates corrupt files
+
+(ert-deftest yeetube-test-load-saved-videos-empty-file ()
+  "An empty bookmark file yields nil without signaling."
+  (let* ((temp-dir (make-temp-file "yeetube-test" t))
+         (user-emacs-directory (file-name-as-directory temp-dir))
+         (yeetube-saved-videos nil))
+    (unwind-protect
+        (progn
+          (write-region "" nil (locate-user-emacs-file "yeetube"))
+          (yeetube-load-saved-videos)
+          (should (null yeetube-saved-videos)))
+      (delete-directory temp-dir t))))
+
+(ert-deftest yeetube-test-load-saved-videos-corrupt-file ()
+  "A malformed bookmark file yields nil without signaling."
+  (let* ((temp-dir (make-temp-file "yeetube-test" t))
+         (user-emacs-directory (file-name-as-directory temp-dir))
+         (yeetube-saved-videos nil))
+    (unwind-protect
+        (progn
+          (write-region "((not valid" nil (locate-user-emacs-file "yeetube"))
+          (yeetube-load-saved-videos)
+          (should (null yeetube-saved-videos)))
+      (delete-directory temp-dir t))))
+
 ;;; Group 8: yeetube-mode-map keybindings
 
 (ert-deftest yeetube-test-keymap-s-bound-to-search ()
