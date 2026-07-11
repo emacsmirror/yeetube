@@ -144,21 +144,30 @@ The vector layout depends on `yeetube-display-thumbnails-p'."
     (_ 0)))
 
 (defun yeetube-ui--parse-relative-date (date)
-  "Convert relative DATE like \"2 days ago\" to comparable seconds."
-  (let* ((split-date (split-string date " "))
-         (value (string-to-number (nth 0 split-date)))
-         (unit (nth 1 split-date))
-         (seconds-per-unit
-          (pcase unit
-            ((or "second" "seconds") 1)
-            ((or "minute" "minutes") 60)
-            ((or "hour" "hours")     3600)
-            ((or "day" "days")       86400)
-            ((or "week" "weeks")     604800)
-            ((or "month" "months")   2592000)
-            ((or "year" "years")     31536000)
-            (_ 0))))
-    (* value seconds-per-unit)))
+  "Convert DATE to comparable seconds.
+
+Handles two formats produced by the RSS and HTML sources:
+
+  * ISO-8601 timestamps like \"2026-05-01T12:00:00+00:00\"
+    (RSS items), converted to epoch seconds with `date-to-time'.
+  * Relative strings like \"2 days ago\" (scraper items),
+    expanded to an approximate age in seconds."
+  (if (string-match-p "\\`[0-9]\\{4\\}-" date)
+      (float-time (date-to-time date))
+    (let* ((split-date (split-string date " "))
+           (value (string-to-number (nth 0 split-date)))
+           (unit (nth 1 split-date))
+           (seconds-per-unit
+            (pcase unit
+              ((or "second" "seconds") 1)
+              ((or "minute" "minutes") 60)
+              ((or "hour" "hours")     3600)
+              ((or "day" "days")       86400)
+              ((or "week" "weeks")     604800)
+              ((or "month" "months")   2592000)
+              ((or "year" "years")     31536000)
+              (_ 0))))
+      (* value seconds-per-unit))))
 
 (defun yeetube-ui--sort-views (a b)
   "Sort entries A and B by view count."

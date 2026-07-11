@@ -97,6 +97,15 @@
   "Unknown unit returns 0."
   (should (= 0 (yeetube-ui--parse-relative-date "5 fortnights ago"))))
 
+(ert-deftest yeetube-ui-test-parse-relative-date-iso ()
+  "ISO-8601 timestamps parse to nonzero epoch seconds."
+  (should (< 0 (yeetube-ui--parse-relative-date "2026-05-01T12:00:00+00:00"))))
+
+(ert-deftest yeetube-ui-test-parse-relative-date-iso-ordered ()
+  "Older ISO timestamps produce smaller values than newer ones."
+  (should (< (yeetube-ui--parse-relative-date "2020-01-01T00:00:00+00:00")
+             (yeetube-ui--parse-relative-date "2026-05-01T12:00:00+00:00"))))
+
 ;;; Group 4: yeetube-ui--entry-to-row
 
 (ert-deftest yeetube-ui-test-entry-to-row-video-no-thumbnails ()
