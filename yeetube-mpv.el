@@ -96,6 +96,10 @@ INFO is optional information to display with `yeetube-mpv-modeline-mode'.
 
 This function is not specific to just playing URLs.  Feel free to use
 it to play local files."
+  (when (and yeetube-mpv-enable-torsocks
+             (or (null yeetube-torsocks-program)
+                 (string= yeetube-torsocks-program "")))
+    (user-error "Torsocks program not found; install torsocks or disable torsocks"))
   (let* ((base-flags (remove "--no-video" yeetube-mpv-additional-flags))
          (flags (append (when yeetube-mpv-no-video '("--no-video"))
                         base-flags))
