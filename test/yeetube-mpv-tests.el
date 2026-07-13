@@ -15,6 +15,15 @@
   (add-to-list 'load-path (expand-file-name ".." dir)))
 (require 'yeetube-mpv)
 
+;;; Format quality handling
+
+(ert-deftest yeetube-mpv-test-nil-video-quality-uses-default ()
+  "Nil video quality produces the valid default 720p format."
+  (should (equal (yeetube-mpv-ytdl-format-video-quality nil)
+                 (yeetube-mpv-ytdl-format-video-quality "720")))
+  (should-not (string-match-p "nil"
+                              (yeetube-mpv-ytdl-format-video-quality nil))))
+
 ;;; Process sentinel: clears modeline state on exit
 
 (ert-deftest yeetube-mpv-test-sentinel-clears-on-exit ()

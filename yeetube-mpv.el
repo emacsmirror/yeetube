@@ -81,8 +81,12 @@
     proc))
 
 (defun yeetube-mpv-ytdl-format-video-quality (resolution)
-  "Return shell quoted argument for ytdlp with RESOLUTION."
-  (shell-quote-argument (format "bestvideo[height<=?%s]+bestaudio/best" resolution)))
+  "Return shell quoted argument for ytdlp with RESOLUTION.
+
+Use the default 720p quality when RESOLUTION is nil."
+  (shell-quote-argument
+   (format "bestvideo[height<=?%s]+bestaudio/best"
+           (or resolution "720"))))
 
 (defun yeetube-mpv-play (input &optional info)
   "Start yeetube process to play INPUT using mpv.
