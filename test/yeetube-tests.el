@@ -211,6 +211,21 @@
     (should (equal "https://youtube.com/channel/UCsystemcrafters/videos"
                    scrape-url))))
 
+(ert-deftest yeetube-test-channel-search-scrapes ()
+  "Channel search scrapes the channel search page."
+  (let (scrape-url)
+    (cl-letf (((symbol-function 'yeetube-display-content-from-url)
+               (lambda (url)
+                 (setq scrape-url url))))
+      (yeetube-channel-search "@foo" "hello world"))
+    (should (equal "https://youtube.com/@foo/search?query=hello%20world"
+                   scrape-url))))
+
+(ert-deftest yeetube-test-channel-search-errors-without-channel ()
+  "Channel search requires a channel ID."
+  (should-error (yeetube-channel-search nil "test") :type 'user-error)
+  (should-error (yeetube-channel-search "  " "test") :type 'user-error))
+
 (ert-deftest yeetube-test-display-channel-path-errors-without-channel ()
   "Channel browsing requires a channel ID."
   (should-error (yeetube--display-channel-path nil "videos")

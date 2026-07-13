@@ -783,7 +783,12 @@ user-visible message.  DETAIL is an optional diagnostic string."
 
 (defun yeetube-channel-search (channel-id query)
   "Search channel with CHANNEL-ID for videos matching QUERY."
-  (interactive (list (yeetube-channel-id-at-point) (yeetube-read-query)))
+  (interactive (list (or (yeetube-channel-id-at-point)
+                         (yeetube--read-channel-id))
+                     (yeetube-read-query)))
+  (unless (and (stringp channel-id)
+               (not (string-empty-p (string-trim channel-id))))
+    (user-error "No channel ID available"))
   (yeetube-display-content-from-url
    (yeetube--channel-url
     channel-id (format "search?query=%s" (url-hexify-string query)))))
