@@ -31,10 +31,12 @@
 (defvar yeetube-default-sort-column)
 (defvar yeetube-default-sort-ascending)
 (defvar yeetube-request-headers)
-(defvar yeetube-content)
 
 ;; Forward declarations -- functions from yeetube.el
 (declare-function yeetube--queue-retrieve "yeetube" (url callback cbargs))
+
+(defvar yeetube-content nil
+  "Tabulated-list rows (ID VECTOR) pairs.")
 
 
 ;;; Faces

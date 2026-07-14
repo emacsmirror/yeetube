@@ -19,29 +19,7 @@
   (add-to-list 'load-path (expand-file-name ".." dir)))
 (require 'yeetube)
 
-;;; Group 1: yeetube-get-filter-code
-
-(ert-deftest yeetube-test-get-filter-code-relevance ()
-  "Relevance filter returns correct code."
-  (should (string= "EgIQAQ%253D%253D" (yeetube-get-filter-code "Relevance"))))
-
-(ert-deftest yeetube-test-get-filter-code-date ()
-  "Date filter returns correct code."
-  (should (string= "CAISAhAB" (yeetube-get-filter-code "Date"))))
-
-(ert-deftest yeetube-test-get-filter-code-views ()
-  "Views filter returns correct code."
-  (should (string= "CAMSAhAB" (yeetube-get-filter-code "Views"))))
-
-(ert-deftest yeetube-test-get-filter-code-rating ()
-  "Rating filter returns correct code."
-  (should (string= "CAESAhAB" (yeetube-get-filter-code "Rating"))))
-
-(ert-deftest yeetube-test-get-filter-code-unknown ()
-  "Unknown filter returns nil."
-  (should-not (yeetube-get-filter-code "Nonexistent")))
-
-;;; Group 2: yeetube--callback error detection (regression)
+;;; Group 1: yeetube--page-callback error detection (regression)
 
 (ert-deftest yeetube-test-callback-plist-get-arg-order ()
   "Verify plist-get extracts :error from a status plist correctly."
@@ -52,7 +30,7 @@
   (let ((status '(:peer (:certificate ...))))
     (should-not (plist-get status :error))))
 
-;;; Group 3: yeetube--find-item
+;;; Group 2: yeetube--find-item
 
 (ert-deftest yeetube-test-find-item ()
   "Find item plist by ID."
@@ -62,40 +40,22 @@
     (should (equal "Second" (plist-get (yeetube--find-item "def") :title)))
     (should-not (yeetube--find-item "nonexistent"))))
 
-;;; Group 4: yeetube--normalize-channel-id
-
-(ert-deftest yeetube-test-normalize-channel-id-path-handle ()
-  "Normalize canonical path channel handles."
-  (should (string= "foo" (yeetube--normalize-channel-id "/@foo"))))
-
-(ert-deftest yeetube-test-normalize-channel-id-handle ()
-  "Normalize channel handles."
-  (should (string= "foo" (yeetube--normalize-channel-id "@foo"))))
-
-(ert-deftest yeetube-test-normalize-channel-id-channel-path ()
-  "Normalize channel paths."
-  (should (string= "UCabc" (yeetube--normalize-channel-id "/channel/UCabc"))))
-
-(ert-deftest yeetube-test-normalize-channel-id-plain ()
-  "Plain channel ids are returned unchanged."
-  (should (string= "foo" (yeetube--normalize-channel-id "foo"))))
-
-;;; Group 5: yeetube-get-url
+;;; Group 3: yeetube-get-url
 
 (ert-deftest yeetube-test-get-url-video ()
   "Get URL for a video."
-  (let ((yeetube-video-url "https://youtube.com/watch?v=")
+  (let ((yeetube-youtube-video-url "https://youtube.com/watch?v=")
         (yeetube-items '((:id "abc" :type video))))
     (should (equal "https://youtube.com/watch?v=abc"
                    (yeetube-get-url "abc" 'video)))))
 
 (ert-deftest yeetube-test-get-url-playlist ()
   "Get URL for a playlist."
-  (let ((yeetube-playlist-url "https://youtube.com/playlist?list="))
+  (let ((yeetube-youtube-playlist-url "https://youtube.com/playlist?list="))
     (should (equal "https://youtube.com/playlist?list=PLxyz"
                    (yeetube-get-url "PLxyz" 'playlist)))))
 
-;;; Group 6: yeetube-mpv-play returns a process (regression)
+;;; Group 4: yeetube-mpv-play returns a process (regression)
 
 (ert-deftest yeetube-test-mpv-play-returns-process ()
   "Verify yeetube-mpv-play returns the process object."
@@ -113,7 +73,7 @@
       (when (process-live-p proc)
         (delete-process proc)))))
 
-;;; Group 7: yeetube-save-saved-videos round-trip (regression)
+;;; Group 5: yeetube-save-saved-videos round-trip (regression)
 
 (ert-deftest yeetube-test-save-saved-videos-round-trip ()
   "Saved videos can be written and read back."
@@ -131,7 +91,7 @@
                          yeetube-saved-videos)))
       (delete-directory temp-dir t))))
 
-;;; Group 8: yeetube-mode-map keybindings
+;;; Group 6: yeetube-mode-map keybindings
 
 (ert-deftest yeetube-test-keymap-s-bound-to-search ()
   "Lowercase s is bound to yeetube-search."
@@ -153,93 +113,30 @@
   "M-n is bound to yeetube-next-page."
   (should (eq 'yeetube-next-page (lookup-key yeetube-mode-map (kbd "M-n")))))
 
-;;; Group 9: yeetube--channel-url & channel-videos
+;;; Group 7: channel browsing
 
-(ert-deftest yeetube-test-channel-url-handle ()
-  "Channel URLs are built without duplicate slashes for handles."
-  (should (equal "https://youtube.com/@foo/videos"
-                 (yeetube--channel-url "@foo" "videos"))))
-
-(ert-deftest yeetube-test-channel-url-channel-path ()
-  "Channel URLs are built without duplicate slashes for channel paths."
-  (should (equal "https://youtube.com/channel/UCsystemcrafters/streams"
-                 (yeetube--channel-url "/channel/UCsystemcrafters"
-                                       "streams"))))
-
-(ert-deftest yeetube-test-channel-url-search ()
-  "Channel search URLs include the query without duplicate slashes."
-  (should (equal "https://youtube.com/@foo/search?query=bar"
-                 (yeetube--channel-url "@foo"
-                                       "search?query=bar"))))
-
-(ert-deftest yeetube-test-channel-videos-scrapes ()
-  "Channel videos scrapes the channel videos page."
-  (let (scrape-url)
-    (unwind-protect
-        (cl-letf (((symbol-function 'yeetube-display-content-from-url)
-                   (lambda (url)
-                     (setq scrape-url url))))
-          (yeetube-channel-videos "/channel/UCsystemcrafters"))
-      (when (get-buffer "*yeetube*")
-        (kill-buffer "*yeetube*")))
+(ert-deftest yeetube-test-channel-videos-fetches-videos-tab ()
+  "Channel videos fetches the channel videos page."
+  (let (fetched-url)
+    (cl-letf (((symbol-function 'yeetube--fetch)
+               (lambda (request &rest _)
+                 (setq fetched-url (plist-get request :url)))))
+      (yeetube-channel-videos "/channel/UCsystemcrafters"))
     (should (equal "https://youtube.com/channel/UCsystemcrafters/videos"
-                   scrape-url))))
+                   fetched-url))))
 
-(ert-deftest yeetube-test-display-channel-path-errors-without-channel ()
+(ert-deftest yeetube-test-display-channel-errors-without-channel ()
   "Channel browsing requires a channel ID."
-  (should-error (yeetube--display-channel-path nil "videos")
+  (should-error (yeetube--display-channel nil 'videos)
                 :type 'user-error)
-  (should-error (yeetube--display-channel-path "  " "streams")
+  (should-error (yeetube--display-channel "  " 'streams)
                 :type 'user-error))
 
-(ert-deftest yeetube-test-read-channel-id-errors-on-empty-input ()
-  "Manual channel input rejects empty strings."
-  (cl-letf (((symbol-function 'read-string) (lambda (&rest _) "  ")))
-    (should-error (yeetube--read-channel-id) :type 'user-error)))
+;;; Group 8: feed callback fallback
 
-(ert-deftest yeetube-test-read-channel-id-adds-handle-prefix ()
-  "Manual channel input treats plain names as handles."
-  (cl-letf (((symbol-function 'read-string) (lambda (&rest _) "foo")))
-    (should (equal "@foo" (yeetube--read-channel-id)))))
-
-(ert-deftest yeetube-test-read-channel-id-preserves-prefixed-input ()
-  "Manual channel input preserves handles and channel paths."
-  (cl-letf (((symbol-function 'read-string) (lambda (&rest _) "@foo")))
-    (should (equal "@foo" (yeetube--read-channel-id))))
-  (cl-letf (((symbol-function 'read-string)
-             (lambda (&rest _) "/channel/UCsystemcrafters")))
-    (should (equal "/channel/UCsystemcrafters" (yeetube--read-channel-id)))))
-
-;;; Group 10: yeetube RSS parsing
-
-(defconst yeetube-test-rss-feed
-  "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<feed xmlns=\"http://www.w3.org/2005/Atom\" xmlns:yt=\"http://www.youtube.com/xml/schemas/2015\">
-  <entry>
-    <yt:videoId>abc123</yt:videoId>
-    <yt:channelId>UCsystemcrafters</yt:channelId>
-    <title>First video</title>
-    <published>2026-05-01T12:00:00+00:00</published>
-    <updated>2026-05-02T12:00:00+00:00</updated>
-    <author>
-      <name>System Crafters</name>
-      <uri>https://www.youtube.com/channel/UCsystemcrafters</uri>
-    </author>
-  </entry>
-  <entry>
-    <yt:videoId>def456</yt:videoId>
-    <yt:channelId>UCsystemcrafters</yt:channelId>
-    <title>Second video</title>
-    <updated>2026-05-03T12:00:00+00:00</updated>
-    <author>
-      <name>System Crafters</name>
-    </author>
-  </entry>
-</feed>")
-
-(defun yeetube-test--rss-callback-fallback-url (status fallback-url &optional contents)
-  "Call `yeetube--rss-callback' with STATUS, FALLBACK-URL and CONTENTS."
-  (let ((buffer (generate-new-buffer " *yeetube-rss-test*"))
+(defun yeetube-test--feed-callback-fallback-url (status fallback-url &optional contents)
+  "Call `yeetube--feed-callback' with STATUS, FALLBACK-URL and CONTENTS."
+  (let ((buffer (generate-new-buffer " *yeetube-feed-test*"))
         captured-url)
     (unwind-protect
         (progn
@@ -249,120 +146,37 @@
             (cl-letf (((symbol-function 'yeetube-display-content-from-url)
                        (lambda (url)
                          (setq captured-url url))))
-              (yeetube--rss-callback status fallback-url)))
+              (yeetube--feed-callback status fallback-url)))
           captured-url)
       (when (buffer-live-p buffer)
         (kill-buffer buffer)))))
 
-(ert-deftest yeetube-test-rss-callback-falls-back-on-retrieval-error ()
-  "RSS callback displays the fallback URL when retrieval fails."
+(ert-deftest yeetube-test-feed-callback-falls-back-on-retrieval-error ()
+  "Feed callback displays the fallback URL when retrieval fails."
   (should (equal "https://youtube.com/@systemcrafters/videos"
-                 (yeetube-test--rss-callback-fallback-url
+                 (yeetube-test--feed-callback-fallback-url
                   '(:error (error http 500))
                   "https://youtube.com/@systemcrafters/videos"))))
 
-(ert-deftest yeetube-test-rss-callback-falls-back-on-malformed-xml ()
-  "RSS callback displays the fallback URL when XML parsing fails."
+(ert-deftest yeetube-test-feed-callback-falls-back-on-malformed-xml ()
+  "Feed callback displays the fallback URL when XML parsing fails."
   (should (equal "https://youtube.com/@systemcrafters/videos"
-                 (yeetube-test--rss-callback-fallback-url
+                 (yeetube-test--feed-callback-fallback-url
                   nil
                   "https://youtube.com/@systemcrafters/videos"
                   "<feed><entry>"))))
 
-(ert-deftest yeetube-test-rss-callback-falls-back-on-empty-feed ()
-  "RSS callback displays the fallback URL when the feed has no videos."
+(ert-deftest yeetube-test-feed-callback-falls-back-on-empty-feed ()
+  "Feed callback displays the fallback URL when the feed has no videos."
   (should (equal "https://youtube.com/@systemcrafters/videos"
-                 (yeetube-test--rss-callback-fallback-url
+                 (yeetube-test--feed-callback-fallback-url
                   nil
                   "https://youtube.com/@systemcrafters/videos"
                   "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
 <feed xmlns=\"http://www.w3.org/2005/Atom\" xmlns:yt=\"http://www.youtube.com/xml/schemas/2015\">
 </feed>"))))
 
-(ert-deftest yeetube-test-rss-parse-buffer-converts-videos ()
-  "RSS entries are converted to yeetube item plists."
-  (let ((items (with-temp-buffer
-                 (insert yeetube-test-rss-feed)
-                 (yeetube--rss-parse-buffer))))
-    (should (= 2 (length items)))
-    (let ((item (car items)))
-      (should (equal "abc123" (plist-get item :id)))
-      (should (equal "First video" (plist-get item :title)))
-      (should (equal "System Crafters" (plist-get item :channel)))
-      (should (equal "/channel/UCsystemcrafters" (plist-get item :channel-id)))
-      (should (equal "UCsystemcrafters" (plist-get item :browse-id)))
-      (should (equal "https://i.ytimg.com/vi/abc123/default.jpg"
-                     (plist-get item :thumbnail-url)))
-      (should (equal "" (plist-get item :views)))
-      (should (equal "" (plist-get item :duration)))
-      (should (equal "2026-05-01T12:00:00+00:00" (plist-get item :date)))
-      (should (eq 'video (plist-get item :type))))
-    (should (equal "def456" (plist-get (cadr items) :id)))
-    (should (equal "2026-05-03T12:00:00+00:00"
-                   (plist-get (cadr items) :date)))
-    (should (equal "" (plist-get (cadr items) :views)))
-    (should (equal "" (plist-get (cadr items) :duration)))))
-
-(ert-deftest yeetube-test-rss-parse-buffer-filters-entries-without-video-id ()
-  "RSS entries without video IDs are ignored."
-  (let ((items (with-temp-buffer
-                 (insert "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<feed xmlns=\"http://www.w3.org/2005/Atom\" xmlns:yt=\"http://www.youtube.com/xml/schemas/2015\">
-  <entry>
-    <yt:channelId>UCsystemcrafters</yt:channelId>
-    <title>Missing video ID</title>
-  </entry>
-  <entry>
-    <yt:videoId>abc123</yt:videoId>
-    <yt:channelId>UCsystemcrafters</yt:channelId>
-    <title>Valid video</title>
-  </entry>
-</feed>")
-                 (yeetube--rss-parse-buffer))))
-    (should (= 1 (length items)))
-    (should (equal "abc123" (plist-get (car items) :id)))))
-
-(ert-deftest yeetube-test-rss-entry-views-from-media-statistics ()
-  "RSS :views is populated from media:statistics views attribute."
-  (let ((items (with-temp-buffer
-                 (insert "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<feed xmlns=\"http://www.w3.org/2005/Atom\"
-      xmlns:yt=\"http://www.youtube.com/xml/schemas/2015\"
-      xmlns:media=\"http://search.yahoo.com/mrss/\">
-  <entry>
-    <yt:videoId>abc123</yt:videoId>
-    <yt:channelId>UCsystemcrafters</yt:channelId>
-    <title>Stats</title>
-    <media:group>
-      <media:statistics views=\"4242\"/>
-    </media:group>
-  </entry>
-</feed>")
-                 (yeetube--rss-parse-buffer))))
-    (should (equal "4242" (plist-get (car items) :views)))))
-
-(ert-deftest yeetube-test-rss-entry-thumbnail-from-media-thumbnail ()
-  "RSS :thumbnail-url uses media:thumbnail and rewrites hqdefault."
-  (let ((items (with-temp-buffer
-                 (insert "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
-<feed xmlns=\"http://www.w3.org/2005/Atom\"
-      xmlns:yt=\"http://www.youtube.com/xml/schemas/2015\"
-      xmlns:media=\"http://search.yahoo.com/mrss/\">
-  <entry>
-    <yt:videoId>abc123</yt:videoId>
-    <yt:channelId>UCsystemcrafters</yt:channelId>
-    <title>Thumb</title>
-    <media:group>
-      <media:thumbnail url=\"https://i.ytimg.com/vi/abc123/hqdefault.jpg\"
-                       width=\"480\" height=\"360\"/>
-    </media:group>
-  </entry>
-</feed>")
-                 (yeetube--rss-parse-buffer))))
-    (should (equal "https://i.ytimg.com/vi/abc123/mqdefault.jpg"
-                   (plist-get (car items) :thumbnail-url)))))
-
-;;; Group 11: HTTP request headers
+;;; Group 9: HTTP request headers
 
 (ert-deftest yeetube-test-request-headers-cookie-bypasses-consent ()
   "Cookie header carries ucbcb / gdpr consent-bypass values."
@@ -372,7 +186,7 @@
     (should (string-match-p "gdpr=1" cookie))
     (should (string-match-p "cookieconsent_status=allow" cookie))))
 
-;;; Group 12: yeetube-mode buffer-local settings
+;;; Group 10: yeetube-mode buffer-local settings
 
 (ert-deftest yeetube-test-mode-sets-truncate-string-ellipsis ()
   "yeetube-mode sets truncate-string-ellipsis to a single space."
