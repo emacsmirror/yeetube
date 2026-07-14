@@ -87,21 +87,22 @@ it to play local files."
   (let* ((base-flags (remove "--no-video" yeetube-mpv-additional-flags))
          (flags (append (when yeetube-mpv-no-video '("--no-video"))
                         base-flags))
-         (yeetube-command
-	  (concat (when yeetube-mpv-enable-torsocks (concat yeetube-torsocks-program " "))
-		  yeetube-mpv-program " --ytdl-format="
-		  (yeetube-mpv-ytdl-format-video-quality yeetube-mpv-video-quality)
-		  " "
-		  (shell-quote-argument input)
-		  (when flags
-		    (concat " " (string-join flags " "))))))
-    (let ((proc (yeetube-mpv-process yeetube-command)))
-      (message "Yeetube command: %s" yeetube-command)
-      (message (if yeetube-mpv-enable-torsocks
-		   "yeetube: Starting mpv process (Using Torsocks)"
-		 "yeetube: Starting mpv process"))
-      (setf yeetube-mpv-currently-playing (and info (format "[%s]" info)))
-      proc)))
+         (command
+          (concat (when yeetube-mpv-enable-torsocks
+                    (concat yeetube-torsocks-program " "))
+                  yeetube-mpv-program " --ytdl-format="
+                  (yeetube-mpv-ytdl-format-video-quality yeetube-mpv-video-quality)
+                  " "
+                  (shell-quote-argument input)
+                  (when flags
+                    (concat " " (string-join flags " ")))))
+         (proc (yeetube-mpv-process command)))
+    (message "Yeetube command: %s" command)
+    (message (if yeetube-mpv-enable-torsocks
+                 "yeetube: Starting mpv process (Using Torsocks)"
+               "yeetube: Starting mpv process"))
+    (setf yeetube-mpv-currently-playing (and info (format "[%s]" info)))
+    proc))
 
 (defconst yeetube-mpv--modeline-format
   '(:eval (format " ♫:%s" (yeetube-mpv-modeline-string))))
