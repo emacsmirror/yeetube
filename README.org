@@ -108,12 +108,12 @@ Disable thumbnails:
 :CUSTOM_ID: apply-filters
 :END:
 To filter the search results based on a specific criterion, you can
-modify the =yeetube-filter= value to your preferred option.
+modify the =yeetube-youtube-filter= value to your preferred option.
 
 For example:
 
 #+begin_src emacs-lisp
-(setf yeetube-filter "Views")
+(setf yeetube-youtube-filter "Views")
 #+end_src
 
 This will filter & sort the search results according to the number of views.

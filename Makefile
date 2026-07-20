@@ -11,9 +11,9 @@ endif
 
 EMACS_CMD ?= emacs
 
-SRCS = yeetube.el yeetube-scraper.el yeetube-ui.el yeetube-mpv.el yeetube-download.el yeetube-ol.el
+SRCS = yeetube.el yeetube-backend.el yeetube-youtube.el yeetube-scraper.el yeetube-ui.el yeetube-mpv.el yeetube-download.el yeetube-ol.el
 
-TESTS = test/yeetube-tests.el test/yeetube-scraper-tests.el test/yeetube-ui-tests.el test/yeetube-mpv-tests.el
+TESTS = test/yeetube-tests.el test/yeetube-youtube-tests.el test/yeetube-scraper-tests.el test/yeetube-ui-tests.el test/yeetube-mpv-tests.el
 
 BATCH = $(EMACS_CMD) -Q --batch -L .
 

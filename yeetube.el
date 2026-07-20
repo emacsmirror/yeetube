@@ -40,17 +40,14 @@
 (require 'compat)
 (require 'url)
 (require 'cl-lib)
-(require 'seq)
 (require 'socks)
 (require 'url-handlers)
 (require 'xdg)
-(require 'json)
 (require 'subr-x)
-(require 'xml)
-(require 'dom)
 
 (require 'keymap-popup)
-(require 'yeetube-scraper)
+(require 'yeetube-backend)
+(require 'yeetube-youtube)
 (require 'yeetube-ui)
 (require 'yeetube-mpv)
 (require 'yeetube-download)
@@ -92,18 +89,6 @@
   "Default directory to download videos."
   :type 'string)
 
-(defcustom yeetube-filter "Relevance"
-  "Sort search results for value.
-Valid options include:
-- \"Relevance\"
-- \"Date\"
-- \"Views\"
-- \"Rating\""
-  :type '(radio (const "Relevance")
-		(const "Date")
-		(const "Views")
-		(const "Rating")))
-
 (defcustom yeetube-default-sort-column nil
   "Column to sort the search results table."
   :type '(radio (const :tag "None" nil)
@@ -136,15 +121,8 @@ Valid options include:
   "When non-nil, fetch & display thumbnails."
   :type 'boolean)
 
-(defvar yeetube-invidious-instances
-  '("vid.puffyan.us" "inv.nadeko.net" "invidious.flokinet.to")
-  "List of invidious instances.")
-
 (defconst yeetube--buffer-name "*yeetube*"
   "Name of the buffer displaying search results.")
-
-(defvar yeetube-content nil
-  "Tabulated-list rows (ID VECTOR) pairs.")
 
 (defvar yeetube-items nil
   "List of scraped item plists.")
@@ -167,10 +145,6 @@ Valid options include:
 (defvar-local yeetube--audio-format nil
   "Buffer-local audio format.")
 
-(defvar-local yeetube--current-url nil
-  "URL that produced the current results.
-Used to re-fetch when the results limit changes.")
-
 (defvar yeetube-saved-videos nil
   "Saved/bookmarked video urls.")
 
@@ -179,34 +153,6 @@ Used to re-fetch when the results limit changes.")
 
 (defvar yeetube-search-history nil
   "History of search terms.")
-
-(defvar yeetube-video-url "https://youtube.com/watch?v="
-  "URL used to play videos from.
-
-You can change this value to an invidious instance.  Although yeetube
-will still query youtube, `yeetube-play' will use the above url to play
-videos from.")
-
-(defvar yeetube-playlist-url "https://youtube.com/playlist?list="
-  "URL used to play playlists from.
-
-You can change this value to an invidious instance.  Although yeetube
-will still query youtube, `yeetube-play' will use the above url to play
-videos from.")
-
-(defvar-local yeetube--channel-id nil
-  "Current channel ID.")
-
-(defconst yeetube-rss-feed-url
-  "https://www.youtube.com/feeds/videos.xml?channel_id="
-  "Base URL for YouTube RSS feeds.")
-
-(defvar yeetube-filter-code-alist
-  '(("Relevance" . "EgIQAQ%253D%253D")
-    ("Date" . "CAISAhAB")
-    ("Views" . "CAMSAhAB")
-    ("Rating" . "CAESAhAB"))
-  "YouTube's opaque sort filter codes, appended as &sp= parameter.")
 
 (defcustom yeetube-request-headers
   '(("Accept-Language" . "en-US,en;q=0.9")
@@ -221,9 +167,6 @@ redirect via `ucbcb=1', plus the broader `gdpr=1' /
 `Accept-Language' to bias responses to your locale."
   :type '(alist :key-type string :value-type string))
 
-(defvar yeetube--client-version "2.20260414.01.00"
-  "YouTube API client version for continuation requests.")
-
 
 ;;; Helpers
 
@@ -232,10 +175,6 @@ redirect via `ucbcb=1', plus the broader `gdpr=1' /
   (cl-find id yeetube-items
            :key (lambda (item) (plist-get item :id))
            :test #'equal))
-
-(defun yeetube-get-filter-code (filter)
-  "Get FILTER code for sorting search results."
-  (cdr (assoc filter yeetube-filter-code-alist)))
 
 (defmacro yeetube-with-tor-socks (&rest body)
   "Execute BODY, routed through tor when `yeetube-enable-tor' is non-nil."
@@ -254,15 +193,27 @@ Routed through tor when `yeetube-enable-tor' is non-nil."
   (yeetube-with-tor-socks
    (url-queue-retrieve url callback cbargs 'silent 'inhibit-cookies)))
 
+(defun yeetube--fetch (request callback &optional cbargs)
+  "Retrieve REQUEST asynchronously, then call CALLBACK with CBARGS.
+REQUEST is a plist (:url U :method M :headers H :data D) as returned
+by the `yeetube-backend-*-request' generics; only :url is required.
+Request headers are appended after `yeetube-request-headers', so
+they can add headers but not override the defaults.  Routed
+through tor when `yeetube-enable-tor' is non-nil."
+  (let ((url-request-method (or (plist-get request :method) "GET"))
+        (url-request-extra-headers (append yeetube-request-headers
+                                           (plist-get request :headers)))
+        (url-request-data (plist-get request :data)))
+    (yeetube-with-tor-socks
+     (url-retrieve (plist-get request :url) callback cbargs
+                   'silent 'inhibit-cookies))))
+
 (defun yeetube-get-url (&optional id type)
-  "Get video or playlist url for entry ID, adjusted for TYPE."
+  "Get video or playlist URL for entry ID, adjusted for TYPE."
   (let* ((id (or id (tabulated-list-get-id)))
          (item (yeetube--find-item id))
-         (type (or type (plist-get item :type))))
-    (format "%s%s" (if (eq type 'video)
-                       yeetube-video-url
-                     yeetube-playlist-url)
-            id)))
+         (type (or type (plist-get item :type) 'video)))
+    (yeetube-backend-item-url yeetube-backend id type)))
 
 (defun yeetube-channel-id-at-point ()
   "Return yeetube channel id at point."
@@ -271,36 +222,13 @@ Routed through tor when `yeetube-enable-tor' is non-nil."
            (item (yeetube--find-item id)))
       (plist-get item :channel-id))))
 
-(defun yeetube--read-channel-id ()
-  "Read a YouTube channel identifier."
-  (let ((channel (string-trim (read-string "Channel: "))))
-    (cond ((string-empty-p channel)
-           (user-error "No channel specified"))
-          ((or (string-prefix-p "@" channel)
-               (string-prefix-p "/" channel))
-           channel)
-          (t (format "@%s" channel)))))
-
 (defun yeetube--browse-id-at-point ()
-  "Return YouTube browse ID for the item at point.
+  "Return backend browse ID for the item at point.
 Dormant infrastructure: consumed by the future `yeetube-home'
-RSS-feed view (see the `yeetube--rss-*' family in this file)."
+feed view (see `yeetube-display-feed')."
   (let* ((id (tabulated-list-get-id))
          (item (yeetube--find-item id)))
     (plist-get item :browse-id)))
-
-(defun yeetube--normalize-channel-id (channel-id)
-  "Return normalized channel identifier from CHANNEL-ID."
-  (cond ((string-prefix-p "/@" channel-id) (substring channel-id 2))
-        ((string-prefix-p "@" channel-id) (substring channel-id 1))
-        ((string-prefix-p "/channel/" channel-id) (substring channel-id 9))
-        (t channel-id)))
-
-(defun yeetube--channel-url (channel-id path)
-  "Return a YouTube channel URL for CHANNEL-ID and PATH."
-  (format "https://youtube.com/%s/%s"
-          (string-remove-prefix "/" channel-id)
-          (string-remove-prefix "/" path)))
 
 (defun yeetube-read-query ()
   "Interactively read a search term."
@@ -345,13 +273,13 @@ RSS-feed view (see the `yeetube--rss-*' family in this file)."
   "Copy the RSS feed URL for the channel at point."
   (interactive)
   (cl-assert (derived-mode-p 'yeetube-mode) nil "Yeetube mode not enabled")
-  (let* ((id (tabulated-list-get-id))
-         (item (yeetube--find-item id))
-         (browse-id (plist-get item :browse-id)))
-    (if (and browse-id (not (string-empty-p browse-id)))
-        (let ((url (concat yeetube-rss-feed-url browse-id)))
-          (kill-new url)
-          (message "Copied RSS feed: %s" url))
+  (let* ((item (yeetube--find-item (tabulated-list-get-id)))
+         (browse-id (plist-get item :browse-id))
+         (url (and browse-id (not (string-empty-p browse-id))
+                   (yeetube-backend-feed-url yeetube-backend browse-id))))
+    (if url
+        (progn (kill-new url)
+               (message "Copied RSS feed: %s" url))
       (message "No channel ID available for this entry"))))
 
 ;;;###autoload
@@ -372,15 +300,14 @@ Select entry title from `yeetube-history' and play corresponding URL."
 
 ;;;###autoload
 (defun yeetube-browse-url ()
-  "Open URL for video at point, using an invidious instance."
+  "Open entry at point in a web browser.
+The YouTube backend browses videos through an invidious instance
+from `yeetube-youtube-invidious-instances'."
   (interactive)
-  (let ((instance (cond ((stringp yeetube-invidious-instances)
-                         yeetube-invidious-instances)
-                        (yeetube-invidious-instances
-                         (seq-random-elt yeetube-invidious-instances))
-                        (t (user-error "No invidious instances configured")))))
-    (browse-url
-     (string-replace "youtube.com" instance (yeetube-get-url)))))
+  (let* ((id (tabulated-list-get-id))
+         (item (yeetube--find-item id))
+         (type (or (plist-get item :type) 'video)))
+    (browse-url (yeetube-backend-browse-url yeetube-backend id type))))
 
 
 ;;; Bookmarks
@@ -478,84 +405,6 @@ Optionally, provide custom own URL."
 
 ;;; Search & Callbacks
 
-;; The `yeetube--rss-*' family and `yeetube-display-rss-feed' below are
-;; dormant infrastructure intended for the upcoming `yeetube-home'
-;; subscription/feed view.  They are not wired into any interactive
-;; command yet: `yeetube-channel-videos' scrapes the HTML videos tab
-;; instead, which is the only way to get duration/views and to paginate
-;; past YouTube's 15-entry RSS cap.
-
-(defun yeetube--rss-feed-url (browse-id)
-  "Return YouTube RSS feed URL for BROWSE-ID."
-  (concat yeetube-rss-feed-url browse-id))
-
-(defun yeetube--rss-entry-text (entry tag)
-  "Return text for direct child TAG in RSS ENTRY, or an empty string."
-  (or (when-let* ((node (dom-child-by-tag entry tag)))
-        ;; Not `dom-inner-text', which is new in Emacs 31.
-        (string-trim (dom-texts node "")))
-      ""))
-
-(defun yeetube--rss-author-name (entry)
-  "Return author name from RSS ENTRY, or an empty string."
-  (or (when-let* ((author (dom-child-by-tag entry 'author))
-                  (name (dom-child-by-tag author 'name)))
-        (string-trim (dom-texts name "")))
-      ""))
-
-(defun yeetube--rss-channel-path (browse-id)
-  "Return channel path for BROWSE-ID, or an empty string."
-  (if (string-empty-p browse-id)
-      ""
-    (format "/channel/%s" browse-id)))
-
-(defun yeetube--rss-entry-views (entry)
-  "Return view count string from ENTRY's `media:statistics' tag.
-YouTube nests `media:statistics' under `media:group', so this uses
-recursive descent.  The view count is exposed as the `views'
-attribute.  Returns an empty string when unavailable."
-  (or (when-let* ((node (car (dom-by-tag entry 'media:statistics)))
-                  (views (dom-attr node 'views)))
-        views)
-      ""))
-
-(defun yeetube--rss-entry-thumbnail (entry video-id)
-  "Return thumbnail URL for ENTRY, falling back to VIDEO-ID's default.
-YouTube nests `media:thumbnail' under `media:group', so this uses
-recursive descent.  Rewrites `hqdefault' to `mqdefault' because
-hqdefault adds black bars at the top and bottom (NewPipeExtractor
-does the same rewrite for the same reason)."
-  (or (when-let* ((node (car (dom-by-tag entry 'media:thumbnail)))
-                  (url (dom-attr node 'url))
-                  ((not (string-empty-p url))))
-        (string-replace "hqdefault" "mqdefault" url))
-      (format "https://i.ytimg.com/vi/%s/default.jpg" video-id)))
-
-(defun yeetube--rss-entry-item (entry)
-  "Convert RSS ENTRY to a yeetube item plist."
-  (let* ((id (yeetube--rss-entry-text entry 'yt:videoId))
-         (browse-id (yeetube--rss-entry-text entry 'yt:channelId))
-         (published (yeetube--rss-entry-text entry 'published))
-         (date (or (and (not (string-empty-p published)) published)
-                   (yeetube--rss-entry-text entry 'updated))))
-    (and (not (string-empty-p id))
-         (list :id id
-               :title (yeetube--rss-entry-text entry 'title)
-               :channel (yeetube--rss-author-name entry)
-               :channel-id (yeetube--rss-channel-path browse-id)
-               :browse-id browse-id
-               :thumbnail-url (yeetube--rss-entry-thumbnail entry id)
-               :views (yeetube--rss-entry-views entry)
-               :duration ""
-               :date date
-               :type 'video))))
-
-(defun yeetube--rss-parse-buffer ()
-  "Parse current YouTube RSS feed buffer into yeetube item plists."
-  (let* ((feed (car (xml-parse-region (point-min) (point-max))))
-         (entries (and feed (dom-by-tag feed 'entry))))
-    (delq nil (mapcar #'yeetube--rss-entry-item entries))))
-
 (defun yeetube--render-items (items limit &optional continuation)
   "Render ITEMS into the *yeetube* buffer with LIMIT and CONTINUATION.
 Pops to the buffer per `yeetube-pop-to-same-window-p', resets the
@@ -588,45 +437,15 @@ scoped to a throwaway buffer for parsing."
   (url-insert url-buffer)
   (decode-coding-region (point-min) (point-max) 'utf-8))
 
-(defun yeetube--rss-callback (status &optional fallback-url)
-  "Yeetube RSS callback handling STATUS with FALLBACK-URL."
-  (let ((url-buffer (current-buffer)))
-    (unwind-protect
-        (if (plist-get status :error)
-            (when fallback-url (yeetube-display-content-from-url fallback-url))
-          (let* ((limit (yeetube--current-limit))
-                 (items (condition-case nil
-                            (with-temp-buffer
-                              (yeetube--decode-url-buffer url-buffer)
-                              (yeetube--rss-parse-buffer))
-                          (error nil))))
-            (cond (items (yeetube--render-items items limit))
-                  (fallback-url
-                   (message "No RSS videos found")
-                   (yeetube-display-content-from-url fallback-url))
-                  (t (message "No RSS videos found")))))
-      (kill-buffer url-buffer))))
-
-(defun yeetube-display-rss-feed (browse-id &optional fallback-url)
-  "Display channel videos from RSS feed for BROWSE-ID.
-When RSS fails, display FALLBACK-URL with the regular scraper."
-  (with-current-buffer (get-buffer-create yeetube--buffer-name)
-    (setq-local yeetube--current-url (yeetube--rss-feed-url browse-id))
-    (let ((url-request-extra-headers yeetube-request-headers)
-          (callback-args (and fallback-url (list fallback-url))))
-      (yeetube-with-tor-socks
-       (url-retrieve yeetube--current-url #'yeetube--rss-callback
-                     callback-args 'silent 'inhibit-cookies)))))
-
-(defconst yeetube--parse-error-message "Could not parse YouTube response"
-  "Message shown when the YouTube response cannot be parsed.")
+(defconst yeetube--parse-error-message "Could not parse backend response"
+  "Message shown when a backend response cannot be parsed.")
 
 (defun yeetube--show-parse-error (&optional detail)
-  "Report a scraper parse failure to the user.
-Clear the loading indicator from the *yeetube* buffer and emit a
+  "Report a backend parse failure to the user.
+Clear the loading indicator from the yeetube buffer and emit a
 user-visible message.  DETAIL is an optional diagnostic string."
-  (when-let* ((buf (get-buffer yeetube--buffer-name)))
-    (with-current-buffer buf
+  (when-let* ((buffer (get-buffer yeetube--buffer-name)))
+    (with-current-buffer buffer
       (let ((inhibit-read-only t))
         (erase-buffer)
         (insert yeetube--parse-error-message))))
@@ -634,52 +453,74 @@ user-visible message.  DETAIL is an optional diagnostic string."
       (message "%s: %s" yeetube--parse-error-message detail)
     (message "%s" yeetube--parse-error-message)))
 
-(defun yeetube--callback (status)
-  "Yeetube callback handling STATUS."
+(defun yeetube--parse-response (status parser)
+  "Return PARSER's result on the current URL response buffer.
+The response buffer is killed afterwards.  Return nil when STATUS
+carries an error.  PARSER is called from a temporary buffer holding
+the decoded response body."
   (let ((url-buffer (current-buffer)))
     (unwind-protect
         (unless (plist-get status :error)
-          (let* ((limit (yeetube--current-limit))
-                 (result (condition-case err
-                             (with-temp-buffer
-                               (yeetube--decode-url-buffer url-buffer)
-                               (yeetube-scraper-parse))
-                           (error
-                            (yeetube--show-parse-error
-                             (error-message-string err))
-                            nil))))
-            (when result
-              (let ((items (plist-get result :items))
-                    (continuation (plist-get result :continuation)))
-                (if items
-                    (progn
-                      (yeetube--render-items items limit continuation)
-                      (when (and continuation (length< items limit))
-                        (yeetube--auto-paginate limit)))
-                  (yeetube--show-parse-error))))))
+          (condition-case err
+              (with-temp-buffer
+                (yeetube--decode-url-buffer url-buffer)
+                (funcall parser))
+            (error
+             (yeetube--show-parse-error (error-message-string err))
+             nil)))
       (kill-buffer url-buffer))))
+
+(defun yeetube--page-callback (status)
+  "Render a parsed results page from a URL response with STATUS."
+  (let* ((limit (yeetube--current-limit))
+         (result (yeetube--parse-response
+                  status
+                  (lambda () (yeetube-backend-parse-page yeetube-backend))))
+         (items (plist-get result :items)))
+    (when items
+      (yeetube--render-items items limit (plist-get result :continuation))
+      (yeetube--auto-paginate limit))))
+
+(defun yeetube--feed-callback (status &optional fallback-url)
+  "Render channel feed items from a URL response with STATUS.
+When the feed yields nothing, fall back to displaying FALLBACK-URL
+with the regular page parser."
+  (let ((items (ignore-errors
+                 (yeetube--parse-response
+                  status
+                  (lambda () (yeetube-backend-parse-feed yeetube-backend))))))
+    (cond (items (yeetube--render-items items (yeetube--current-limit)))
+          ((plist-get status :error)
+           (when fallback-url (yeetube-display-content-from-url fallback-url)))
+          (fallback-url
+           (message "No feed videos found")
+           (yeetube-display-content-from-url fallback-url))
+          (t (message "No feed videos found")))))
+
+(defun yeetube-display-feed (channel &optional fallback-url)
+  "Display CHANNEL's videos from the backend's feed.
+When the feed fails, display FALLBACK-URL with the regular parser.
+Dormant infrastructure for the upcoming `yeetube-home'
+subscription view; `yeetube-channel-videos' scrapes the HTML
+videos tab instead, which is the only way to get duration/views
+and to paginate past YouTube's 15-entry RSS cap."
+  (let ((url (yeetube-backend-feed-url yeetube-backend channel)))
+    (unless url
+      (user-error "Backend `%s' does not provide feeds" yeetube-backend))
+    (yeetube--fetch (list :url url) #'yeetube--feed-callback
+                    (and fallback-url (list fallback-url)))))
 
 (defun yeetube-display-content-from-url (url)
   "Display the video results from URL."
-  (with-current-buffer (get-buffer-create yeetube--buffer-name)
-    (setq-local yeetube--current-url url)
-    (let ((url-request-extra-headers yeetube-request-headers))
-      (yeetube-with-tor-socks
-       (url-retrieve url #'yeetube--callback nil 'silent 'inhibit-cookies)))))
+  (yeetube--fetch (list :url url) #'yeetube--page-callback))
 
 ;;;###autoload
 (defun yeetube-search (query)
   "Search for QUERY."
   (interactive (list (yeetube-read-query)))
   (yeetube--display-loading)
-  (yeetube-display-content-from-url
-   ;; `ucbcb=1' bypasses EU cookie consent; sent via the Cookie header
-   ;; configured in `yeetube-request-headers'.
-   (format "https://youtube.com/search?q=%s%s"
-           (url-hexify-string query)
-           (if yeetube-filter
-	       (format "&sp=%s" (yeetube-get-filter-code yeetube-filter))
-	     ""))))
+  (yeetube--fetch (yeetube-backend-search-request yeetube-backend query)
+                  #'yeetube--page-callback))
 
 
 ;;; Pagination
@@ -696,102 +537,59 @@ user-visible message.  DETAIL is an optional diagnostic string."
   (interactive)
   (unless yeetube--continuation
     (user-error "No more results"))
-  (let ((api-path (plist-get yeetube--continuation :url)))
-    (when (or (null api-path) (string-empty-p api-path))
-      (setq-local yeetube--continuation nil)
-      (user-error "Could not determine next page")))
-  (let* ((token (plist-get yeetube--continuation :token))
-         (api-path (plist-get yeetube--continuation :url))
-         (endpoint (concat "https://www.youtube.com" api-path))
-         (url-request-method "POST")
-         (url-request-extra-headers
-          (append yeetube-request-headers
-                  '(("Content-Type" . "application/json"))))
-         (url-request-data
-          (json-serialize
-           `((context (client (clientName . "WEB")
-                              (clientVersion . ,yeetube--client-version)))
-             (continuation . ,token)))))
-    (yeetube-with-tor-socks
-     (url-retrieve endpoint #'yeetube--pagination-callback
-                   nil 'silent 'inhibit-cookies))))
+  (yeetube--fetch
+   (yeetube-backend-continuation-request yeetube-backend yeetube--continuation)
+   #'yeetube--continuation-callback))
 
-(defun yeetube--pagination-callback (status)
-  "Handle pagination response with STATUS."
-  (let ((url-buffer (current-buffer)))
-    (unwind-protect
-        (unless (plist-get status :error)
-          (let* ((result (condition-case err
-                             (with-temp-buffer
-                               (yeetube--decode-url-buffer url-buffer)
-                               (goto-char (point-min))
-                               (search-forward "{" nil t)
-                               (backward-char)
-                               (yeetube-scraper-parse-continuation-response
-                                (json-parse-buffer :object-type 'alist
-                                                   :array-type 'list)))
-                           (error
-                            (message "%s: %s"
-                                     yeetube--parse-error-message
-                                     (error-message-string err))
-                            nil))))
-            (when result
-              (let ((items (plist-get result :items))
-                    (continuation (plist-get result :continuation)))
-                (when items
-                  (with-current-buffer yeetube--buffer-name
-                    (setq yeetube-items (append yeetube-items items))
-                    (setq-local yeetube--continuation continuation)
-                    (yeetube-ui-append items)
-                    (yeetube-ui-fetch-thumbnails items yeetube--buffer-name)
-                    (when (and continuation
-                               (length< yeetube-items
-                                        (or yeetube--results-limit yeetube-results-limit)))
-                      (yeetube--auto-paginate
-                       (or yeetube--results-limit yeetube-results-limit)))))))))
-      (kill-buffer url-buffer))))
+(defun yeetube--continuation-callback (status)
+  "Append the parsed next page from a URL response with STATUS."
+  (let* ((result (yeetube--parse-response
+                  status
+                  (lambda () (yeetube-backend-parse-continuation yeetube-backend))))
+         (items (plist-get result :items)))
+    (when items
+      (with-current-buffer yeetube--buffer-name
+        (setq yeetube-items (append yeetube-items items))
+        (setq-local yeetube--continuation (plist-get result :continuation))
+        (yeetube-ui-append items)
+        (yeetube-ui-fetch-thumbnails items yeetube--buffer-name)
+        (yeetube--auto-paginate (yeetube--current-limit))))))
 
 
 ;;; Channel browsing
 
-(defun yeetube--display-channel-path (channel-id path)
-  "Display channel CHANNEL-ID content at PATH."
-  (unless (and (stringp channel-id)
-               (not (string-empty-p (string-trim channel-id))))
+(defun yeetube--display-channel (channel what &optional query)
+  "Fetch and display CHANNEL's WHAT content.
+WHAT is `videos', `streams', or `search' with a QUERY string."
+  (unless (and (stringp channel)
+               (not (string-empty-p (string-trim channel))))
     (user-error "No channel ID available"))
-  (let* ((channel-id (string-trim channel-id))
-         (normalized-id (yeetube--normalize-channel-id channel-id))
-         (url (yeetube--channel-url channel-id path)))
-    (message "Fetching channel %s from %s" normalized-id url)
-    (with-current-buffer (get-buffer-create yeetube--buffer-name)
-      (setf yeetube--channel-id normalized-id)
-      (yeetube-display-content-from-url url))))
+  (let ((channel (string-trim channel)))
+    (message "Fetching channel %s" channel)
+    (yeetube--fetch
+     (yeetube-backend-channel-request yeetube-backend channel what query)
+     #'yeetube--page-callback)))
 
 ;;;###autoload
 (defun yeetube-channel-videos (&optional channel-id)
   "View videos for the channel with CHANNEL-ID."
   (interactive (list (or (yeetube-channel-id-at-point)
-                         (yeetube--read-channel-id))))
-  (yeetube--display-channel-path channel-id "videos"))
+                         (yeetube-backend-read-channel yeetube-backend))))
+  (yeetube--display-channel channel-id 'videos))
 
 ;;;###autoload
 (defun yeetube-channel-streams (&optional channel-id)
   "View streams for the channel with CHANNEL-ID."
   (interactive (list (or (yeetube-channel-id-at-point)
-                         (yeetube--read-channel-id))))
-  (yeetube--display-channel-path channel-id "streams"))
+                         (yeetube-backend-read-channel yeetube-backend))))
+  (yeetube--display-channel channel-id 'streams))
 
 (defun yeetube-channel-search (channel-id query)
   "Search channel with CHANNEL-ID for videos matching QUERY."
   (interactive (list (or (yeetube-channel-id-at-point)
-                         (yeetube--read-channel-id))
+                         (yeetube-backend-read-channel yeetube-backend))
                      (yeetube-read-query)))
-  (unless (and (stringp channel-id)
-               (not (string-empty-p (string-trim channel-id))))
-    (user-error "No channel ID available"))
-  (yeetube-display-content-from-url
-   (yeetube--channel-url
-    channel-id (format "search?query=%s" (url-hexify-string query)))))
+  (yeetube--display-channel channel-id 'search query))
 
 
 ;;; Mode
