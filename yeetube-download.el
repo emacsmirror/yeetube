@@ -26,7 +26,8 @@
 ;;; Code:
 
 (require 'cl-lib)
-
+(require 'seq)
+(require 'subr-x)
 ;; Forward declarations for variables defined in yeetube.el
 (defvar yeetube-ytdlp-program)
 (defvar yeetube-torsocks-program)
@@ -42,7 +43,9 @@ Optional values:
  AUDIO-FORMAT to extract and keep contents as specified audio-format only."
   (unless yeetube-ytdlp-program
     (error "Executable for yt-dlp not found.  Please set `yeetube-ytdlp-program'"))
-  (when (and yeetube-enable-tor (not yeetube-torsocks-program))
+  (when (and yeetube-enable-tor
+             (or (null yeetube-torsocks-program)
+                 (string-empty-p yeetube-torsocks-program)))
     (user-error "Executable for torsocks not found"))
   (let* ((tor-command (when yeetube-enable-tor yeetube-torsocks-program))
          (name-command (when name (format "-o %s" (shell-quote-argument name))))

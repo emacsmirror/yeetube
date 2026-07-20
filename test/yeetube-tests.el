@@ -287,6 +287,35 @@ Return a cons of the resulting display text and captured message."
       (should (string= "No videos found" display))
       (should (string= "No videos found" message)))))
 
+(ert-deftest yeetube-test-continuation-callback-reports-empty-results ()
+  "An empty continuation preserves rows, reports exhaustion, and clears state."
+  (let ((response-buffer (generate-new-buffer " *yeetube-response-test*"))
+        captured-message)
+    (unwind-protect
+        (progn
+          (with-current-buffer (get-buffer-create yeetube--buffer-name)
+            (let ((inhibit-read-only t))
+              (erase-buffer)
+              (insert "Existing results"))
+            (setq-local yeetube--continuation '(:token "stale" :url "/next")))
+          (cl-letf (((symbol-function 'message)
+                     (lambda (format-string &rest args)
+                       (setq captured-message
+                             (apply #'format format-string args))))
+                    ((symbol-function 'yeetube--decode-url-buffer) #'ignore)
+                    ((symbol-function 'yeetube-backend-parse-continuation)
+                     (lambda (&rest _) '(:items nil :continuation nil))))
+            (with-current-buffer response-buffer
+              (yeetube--continuation-callback nil)))
+          (with-current-buffer yeetube--buffer-name
+            (should (string= "Existing results" (buffer-string)))
+            (should-not yeetube--continuation))
+          (should (string= "No more videos found" captured-message)))
+      (when (buffer-live-p response-buffer)
+        (kill-buffer response-buffer))
+      (when (get-buffer yeetube--buffer-name)
+        (kill-buffer yeetube--buffer-name)))))
+
 (ert-deftest yeetube-test-replay-rejects-unknown-title ()
   "Replay never calls the player for an unknown title."
   (let ((yeetube-history '((:title "Known" :url "https://example.com/known")))
@@ -298,15 +327,16 @@ Return a cons of the resulting display text and captured message."
 
 (ert-deftest yeetube-test-download-requires-torsocks-when-tor-enabled ()
   "Tor-enabled downloads fail closed without torsocks."
-  (let ((yeetube-ytdlp-program "yt-dlp")
-        (yeetube-enable-tor t)
-        (yeetube-torsocks-program nil)
-        called)
-    (cl-letf (((symbol-function 'call-process-shell-command)
-               (lambda (&rest _) (setq called t))))
-      (should-error (yeetube-download--ytdlp "https://example.com/video")
-                    :type 'user-error)
-      (should-not called))))
+  (dolist (program '(nil ""))
+    (let ((yeetube-ytdlp-program "yt-dlp")
+          (yeetube-enable-tor t)
+          (yeetube-torsocks-program program)
+          called)
+      (cl-letf (((symbol-function 'call-process-shell-command)
+                 (lambda (&rest _) (setq called t))))
+        (should-error (yeetube-download--ytdlp "https://example.com/video")
+                      :type 'user-error)
+        (should-not called)))))
 
 (ert-deftest yeetube-test-download-uses-configured-torsocks ()
   "Tor-enabled downloads invoke configured torsocks."
@@ -319,12 +349,25 @@ Return a cons of the resulting display text and captured message."
       (yeetube-download--ytdlp "https://example.com/video")
       (should (string-prefix-p "torsocks yt-dlp " command)))))
 
+(defun yeetube-test--settings-menu-text ()
+  "Return the fully rendered settings menu text."
+  (keymap-popup--render
+   (keymap-popup--resolve-descriptions
+    (keymap-popup--collect-descriptions yeetube-settings-map)
+    yeetube-settings-map)))
+
 (ert-deftest yeetube-test-video-switch-label ()
-  "Video switch label describes the enabled playback state."
-  (let ((yeetube-mpv-no-video nil))
-    (should (string= "Video [on]" (yeetube--video-switch-label))))
-  (let ((yeetube-mpv-no-video t))
-    (should (string= "Video [off]" (yeetube--video-switch-label)))))
+  "Rendered settings show the video state exactly once."
+  (let ((yeetube-mpv-no-video nil)
+        (yeetube-mpv-enable-torsocks nil))
+    (should (string-match-p "Video \\[on\\]" (yeetube-test--settings-menu-text)))
+    (should-not (string-match-p "Video \\[on\\] \\[off\\]"
+                                (yeetube-test--settings-menu-text))))
+  (let ((yeetube-mpv-no-video t)
+        (yeetube-mpv-enable-torsocks nil))
+    (should (string-match-p "Video \\[off\\]" (yeetube-test--settings-menu-text)))
+    (should-not (string-match-p "Video \\[off\\] \\[on\\]"
+                                (yeetube-test--settings-menu-text)))))
 
 (provide 'yeetube-tests)
 ;;; yeetube-tests.el ends here

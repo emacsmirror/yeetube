@@ -21,6 +21,10 @@
   "Empty string returns empty."
   (should (string= "" (yeetube-ui--format-views ""))))
 
+(ert-deftest yeetube-ui-test-format-views-zero ()
+  "A genuine zero count remains visible."
+  (should (string= "0" (yeetube-ui--format-views "0 views"))))
+
 (ert-deftest yeetube-ui-test-format-views-single-digit ()
   "Single digit has no commas."
   (should (string= "5" (yeetube-ui--format-views "5"))))
@@ -178,6 +182,14 @@
         (b '("id2" ["Title B" "1.2K" "5:00" "2 days ago" "Ch"])))
     (should (yeetube-ui--sort-views a b))
     (should-not (yeetube-ui--sort-views b a))))
+
+(ert-deftest yeetube-ui-test-sort-views-zero ()
+  "Zero sorts below positive view counts."
+  (let ((yeetube-display-thumbnails-p nil)
+        (zero '("id1" ["Title A" "0" "3:00" "1 day ago" "Ch"]))
+        (positive '("id2" ["Title B" "1" "5:00" "2 days ago" "Ch"])))
+    (should (yeetube-ui--sort-views zero positive))
+    (should-not (yeetube-ui--sort-views positive zero))))
 
 (ert-deftest yeetube-ui-test-sort-duration-with-thumbnails ()
   "Sort by duration works when thumbnails are enabled (index 3)."

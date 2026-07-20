@@ -92,7 +92,7 @@
   "Format VIEWS-STRING as a comma-separated numeric view count."
   (let* ((views (yeetube-ui--views-number views-string))
          (digits (number-to-string views)))
-    (if (= views 0)
+    (if (not (string-match-p "[0-9]" views-string))
         ""
       (let ((len (length digits)))
         (string-join
