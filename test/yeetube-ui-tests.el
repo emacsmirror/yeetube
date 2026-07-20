@@ -41,6 +41,11 @@
   "Non-digit characters are stripped before formatting."
   (should (string= "1,234" (yeetube-ui--format-views "1,234 views"))))
 
+(ert-deftest yeetube-ui-test-format-views-abbreviations ()
+  "Abbreviated view counts retain their magnitude."
+  (should (string= "1,200" (yeetube-ui--format-views "1.2K")))
+  (should (string= "3,400,000" (yeetube-ui--format-views "3.4M views"))))
+
 ;;; Group 2: yeetube-ui--duration-to-seconds
 
 (ert-deftest yeetube-ui-test-duration-to-seconds-hhmmss ()
@@ -163,6 +168,14 @@
   (let ((yeetube-display-thumbnails-p nil)
         (a '("id1" ["Title A" "1,000" "3:00" "1 day ago" "Ch"]))
         (b '("id2" ["Title B" "2,000" "5:00" "2 days ago" "Ch"])))
+    (should (yeetube-ui--sort-views a b))
+    (should-not (yeetube-ui--sort-views b a))))
+
+(ert-deftest yeetube-ui-test-sort-views-abbreviation ()
+  "Abbreviated counts sort by magnitude."
+  (let ((yeetube-display-thumbnails-p nil)
+        (a '("id1" ["Title A" "999" "3:00" "1 day ago" "Ch"]))
+        (b '("id2" ["Title B" "1.2K" "5:00" "2 days ago" "Ch"])))
     (should (yeetube-ui--sort-views a b))
     (should-not (yeetube-ui--sort-views b a))))
 

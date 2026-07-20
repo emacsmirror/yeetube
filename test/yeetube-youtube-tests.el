@@ -125,6 +125,24 @@
     (should (equal "https://inv.example.org/watch?v=abc"
                    (yeetube-backend-browse-url 'youtube "abc" 'video)))))
 
+(ert-deftest yeetube-youtube-test-browse-url-removes-www-youtube-host ()
+  "The www.youtube.com playback base produces a valid invidious URL."
+  (let ((yeetube-youtube-video-url "https://www.youtube.com/watch?v=")
+        (yeetube-youtube-invidious-instances "inv.example.org"))
+    (should (equal "https://inv.example.org/watch?v=abc"
+                   (yeetube-backend-browse-url 'youtube "abc" 'video)))))
+
+(ert-deftest yeetube-youtube-test-browse-url-selects-list-instance ()
+  "A configured instance list uses the selected invidious host."
+  (let ((yeetube-youtube-video-url "https://www.youtube.com/watch?v=")
+        (yeetube-youtube-invidious-instances '("one.example" "two.example")))
+    (cl-letf (((symbol-function 'seq-random-elt)
+               (lambda (instances)
+                 (should (equal '("one.example" "two.example") instances))
+                 "two.example")))
+      (should (equal "https://two.example/watch?v=abc"
+                     (yeetube-backend-browse-url 'youtube "abc" 'video))))))
+
 (ert-deftest yeetube-youtube-test-browse-url-errors-without-instances ()
   (let ((yeetube-youtube-invidious-instances nil))
     (should-error (yeetube-backend-browse-url 'youtube "abc" 'video)

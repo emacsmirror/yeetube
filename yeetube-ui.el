@@ -74,10 +74,25 @@
 
 ;;; View count formatting
 
+(defun yeetube-ui--views-number (views-string)
+  "Return the numeric view count represented by VIEWS-STRING."
+  (let ((case-fold-search t))
+    (if (string-match
+         "\\([0-9]+\\(?:\\.[0-9]+\\)?\\)[[:space:]]*\\([KMB]\\)"
+         views-string)
+        (round (* (string-to-number (match-string 1 views-string))
+                  (pcase (upcase (match-string 2 views-string))
+                    ("K" 1000)
+                    ("M" 1000000)
+                    ("B" 1000000000))))
+      (string-to-number
+       (replace-regexp-in-string "[^0-9]" "" views-string)))))
+
 (defun yeetube-ui--format-views (views-string)
-  "Format VIEWS-STRING by extracting digits and adding commas."
-  (let ((digits (replace-regexp-in-string "[^0-9]" "" views-string)))
-    (if (string-empty-p digits)
+  "Format VIEWS-STRING as a comma-separated numeric view count."
+  (let* ((views (yeetube-ui--views-number views-string))
+         (digits (number-to-string views)))
+    (if (= views 0)
         ""
       (let ((len (length digits)))
         (string-join
@@ -174,10 +189,8 @@ Handles two formats produced by the RSS and HTML sources:
 (defun yeetube-ui--sort-views (a b)
   "Sort entries A and B by view count."
   (let* ((idx (yeetube-ui--column-index "views"))
-         (views-a (string-to-number
-                   (replace-regexp-in-string "," "" (aref (cadr a) idx))))
-         (views-b (string-to-number
-                   (replace-regexp-in-string "," "" (aref (cadr b) idx)))))
+         (views-a (yeetube-ui--views-number (aref (cadr a) idx)))
+         (views-b (yeetube-ui--views-number (aref (cadr b) idx))))
     (< views-a views-b)))
 
 (defun yeetube-ui--sort-duration (a b)

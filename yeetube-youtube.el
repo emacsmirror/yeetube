@@ -171,8 +171,10 @@ WHAT is `videos', `streams', or `search' with a QUERY string."
                         (yeetube-youtube-invidious-instances
                          (seq-random-elt yeetube-youtube-invidious-instances))
                         (t (user-error "No invidious instances configured")))))
-    (string-replace "youtube.com" instance
-                    (yeetube-backend-item-url backend id type))))
+    (replace-regexp-in-string
+     "\\`https?://\\(?:www\\.\\)?youtube\\.com"
+     (concat "https://" instance)
+     (yeetube-backend-item-url backend id type))))
 
 ;;; Channel input
 

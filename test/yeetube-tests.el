@@ -235,5 +235,96 @@
       (yeetube-mode)
       (should (string= " " truncate-string-ellipsis)))))
 
+(defun yeetube-test--call-response-callback (callback status display-text)
+  "Call CALLBACK with STATUS while the yeetube buffer shows DISPLAY-TEXT.
+Return a cons of the resulting display text and captured message."
+  (let ((response-buffer (generate-new-buffer " *yeetube-response-test*"))
+        captured-message)
+    (unwind-protect
+        (progn
+          (with-current-buffer (get-buffer-create yeetube--buffer-name)
+            (let ((inhibit-read-only t))
+              (erase-buffer)
+              (insert display-text)))
+          (cl-letf (((symbol-function 'message)
+                     (lambda (format-string &rest args)
+                       (setq captured-message
+                             (apply #'format format-string args)))))
+            (with-current-buffer response-buffer
+              (funcall callback status)))
+          (cons (with-current-buffer yeetube--buffer-name (buffer-string))
+                captured-message))
+      (when (buffer-live-p response-buffer)
+        (kill-buffer response-buffer))
+      (when (get-buffer yeetube--buffer-name)
+        (kill-buffer yeetube--buffer-name)))))
+
+(ert-deftest yeetube-test-page-callback-reports-http-error ()
+  "An initial HTTP error clears the loading indicator and notifies the user."
+  (pcase-let ((`(,display . ,message)
+               (yeetube-test--call-response-callback
+                #'yeetube--page-callback '(:error (error http 500)) "Loading...")))
+    (should-not (string-match-p "Loading" display))
+    (should (string-match-p "Could not retrieve backend response" message))))
+
+(ert-deftest yeetube-test-continuation-callback-reports-http-error ()
+  "A continuation HTTP error preserves results and notifies the user."
+  (pcase-let ((`(,display . ,message)
+               (yeetube-test--call-response-callback
+                #'yeetube--continuation-callback
+                '(:error (error http 500)) "Existing results")))
+    (should (string= "Existing results" display))
+    (should (string-match-p "Could not retrieve backend response" message))))
+
+(ert-deftest yeetube-test-page-callback-reports-empty-results ()
+  "A successful empty page replaces the loading indicator with a message."
+  (cl-letf (((symbol-function 'yeetube--decode-url-buffer) #'ignore)
+            ((symbol-function 'yeetube-backend-parse-page)
+             (lambda (&rest _) '(:items nil))))
+    (pcase-let ((`(,display . ,message)
+                 (yeetube-test--call-response-callback
+                  #'yeetube--page-callback nil "Loading...")))
+      (should (string= "No videos found" display))
+      (should (string= "No videos found" message)))))
+
+(ert-deftest yeetube-test-replay-rejects-unknown-title ()
+  "Replay never calls the player for an unknown title."
+  (let ((yeetube-history '((:title "Known" :url "https://example.com/known")))
+        played)
+    (cl-letf (((symbol-function 'completing-read) (lambda (&rest _) "Unknown"))
+              (yeetube-play-function (lambda (&rest args) (setq played args))))
+      (should-error (yeetube-replay) :type 'user-error)
+      (should-not played))))
+
+(ert-deftest yeetube-test-download-requires-torsocks-when-tor-enabled ()
+  "Tor-enabled downloads fail closed without torsocks."
+  (let ((yeetube-ytdlp-program "yt-dlp")
+        (yeetube-enable-tor t)
+        (yeetube-torsocks-program nil)
+        called)
+    (cl-letf (((symbol-function 'call-process-shell-command)
+               (lambda (&rest _) (setq called t))))
+      (should-error (yeetube-download--ytdlp "https://example.com/video")
+                    :type 'user-error)
+      (should-not called))))
+
+(ert-deftest yeetube-test-download-uses-configured-torsocks ()
+  "Tor-enabled downloads invoke configured torsocks."
+  (let ((yeetube-ytdlp-program "yt-dlp")
+        (yeetube-enable-tor t)
+        (yeetube-torsocks-program "torsocks")
+        command)
+    (cl-letf (((symbol-function 'call-process-shell-command)
+               (lambda (value &rest _) (setq command value))))
+      (yeetube-download--ytdlp "https://example.com/video")
+      (should (string-prefix-p "torsocks yt-dlp " command)))))
+
+(ert-deftest yeetube-test-video-switch-label ()
+  "Video switch label describes the enabled playback state."
+  (let ((yeetube-mpv-no-video nil))
+    (should (string= "Video [on]" (yeetube--video-switch-label))))
+  (let ((yeetube-mpv-no-video t))
+    (should (string= "Video [off]" (yeetube--video-switch-label)))))
+
 (provide 'yeetube-tests)
 ;;; yeetube-tests.el ends here

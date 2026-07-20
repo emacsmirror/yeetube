@@ -289,11 +289,12 @@ feed view (see `yeetube-display-feed')."
 Select entry title from `yeetube-history' and play corresponding URL."
   (interactive)
   (let* ((titles (mapcar (lambda (entry) (plist-get entry :title)) yeetube-history))
-         (selected (completing-read "Replay: " titles))
+         (selected (completing-read "Replay: " titles nil t))
          (selected-entry (cl-find-if (lambda (entry)
 				       (string= selected (plist-get entry :title)))
 				     yeetube-history))
-	 (title (plist-get selected-entry :title))
+	 (title (or (plist-get selected-entry :title)
+                    (user-error "Unknown replay entry: %s" selected)))
          (url (plist-get selected-entry :url)))
     (funcall yeetube-play-function url (and yeetube-mpv-modeline-mode title))
     (message "Replaying: %s" selected)))
@@ -440,18 +441,29 @@ scoped to a throwaway buffer for parsing."
 (defconst yeetube--parse-error-message "Could not parse backend response"
   "Message shown when a backend response cannot be parsed.")
 
-(defun yeetube--show-parse-error (&optional detail)
-  "Report a backend parse failure to the user.
-Clear the loading indicator from the yeetube buffer and emit a
-user-visible message.  DETAIL is an optional diagnostic string."
+(defconst yeetube--retrieve-error-message "Could not retrieve backend response"
+  "Message shown when a backend response could not be retrieved.")
+
+(defconst yeetube--empty-results-message "No videos found"
+  "Message shown when a successful response contains no videos.")
+
+(defun yeetube--show-response-error (message &optional detail)
+  "Report response failure MESSAGE to the user.
+Clear an active loading indicator without erasing existing results.
+DETAIL is an optional diagnostic string."
   (when-let* ((buffer (get-buffer yeetube--buffer-name)))
     (with-current-buffer buffer
-      (let ((inhibit-read-only t))
-        (erase-buffer)
-        (insert yeetube--parse-error-message))))
+      (when (string-match-p "\\`Loading" (buffer-string))
+        (let ((inhibit-read-only t))
+          (erase-buffer)
+          (insert message)))))
   (if detail
-      (message "%s: %s" yeetube--parse-error-message detail)
-    (message "%s" yeetube--parse-error-message)))
+      (message "%s: %s" message detail)
+    (message "%s" message)))
+
+(defun yeetube--show-parse-error (&optional detail)
+  "Report a backend parse failure with optional DETAIL."
+  (yeetube--show-response-error yeetube--parse-error-message detail))
 
 (defun yeetube--parse-response (status parser)
   "Return PARSER's result on the current URL response buffer.
@@ -460,7 +472,12 @@ carries an error.  PARSER is called from a temporary buffer holding
 the decoded response body."
   (let ((url-buffer (current-buffer)))
     (unwind-protect
-        (unless (plist-get status :error)
+        (if-let* ((status-error (plist-get status :error)))
+            (progn
+              (yeetube--show-response-error
+               yeetube--retrieve-error-message
+               (error-message-string status-error))
+              nil)
           (condition-case err
               (with-temp-buffer
                 (yeetube--decode-url-buffer url-buffer)
@@ -477,9 +494,11 @@ the decoded response body."
                   status
                   (lambda () (yeetube-backend-parse-page yeetube-backend))))
          (items (plist-get result :items)))
-    (when items
-      (yeetube--render-items items limit (plist-get result :continuation))
-      (yeetube--auto-paginate limit))))
+    (cond (items
+           (yeetube--render-items items limit (plist-get result :continuation))
+           (yeetube--auto-paginate limit))
+          (result
+           (yeetube--show-response-error yeetube--empty-results-message)))))
 
 (defun yeetube--feed-callback (status &optional fallback-url)
   "Render channel feed items from a URL response with STATUS.
@@ -634,6 +653,10 @@ WHAT is `videos', `streams', or `search' with a QUERY string."
   (format "%s: %s" label
           (propertize (format "%s" value) 'face 'font-lock-constant-face)))
 
+(defun yeetube--video-switch-label ()
+  "Return the current video playback switch label."
+  (format "Video [%s]" (if yeetube-mpv-no-video "off" "on")))
+
 (keymap-popup-define yeetube-settings-map
   "Yeetube settings menu."
   :description "Yeetube Settings"
@@ -653,7 +676,7 @@ WHAT is `videos', `streams', or `search' with a QUERY string."
                    "Audio format" (or yeetube--audio-format "none")))
        yeetube-set-audio-format :stay-open t)
   :group "Switches"
-  "n" ("No video" :switch yeetube-mpv-no-video)
+  "n" (#'yeetube--video-switch-label :switch yeetube-mpv-no-video)
   "t" ("Torsocks" :switch yeetube-mpv-enable-torsocks))
 
 (keymap-popup-define yeetube-mode-map
