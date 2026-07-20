@@ -582,7 +582,7 @@ and to paginate past YouTube's 15-entry RSS cap."
         (yeetube--auto-paginate (yeetube--current-limit))))
      (result
       (with-current-buffer yeetube--buffer-name
-        (setq-local yeetube--continuation (plist-get result :continuation)))
+        (setq-local yeetube--continuation nil))
       (yeetube--show-response-error yeetube--no-more-results-message)))))
 
 

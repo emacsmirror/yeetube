@@ -304,12 +304,19 @@ Return a cons of the resulting display text and captured message."
                              (apply #'format format-string args))))
                     ((symbol-function 'yeetube--decode-url-buffer) #'ignore)
                     ((symbol-function 'yeetube-backend-parse-continuation)
-                     (lambda (&rest _) '(:items nil :continuation nil))))
+                     (lambda (&rest _)
+                       '(:items nil
+                         :continuation (:token "next" :url "/new")))))
             (with-current-buffer response-buffer
               (yeetube--continuation-callback nil)))
           (with-current-buffer yeetube--buffer-name
             (should (string= "Existing results" (buffer-string)))
-            (should-not yeetube--continuation))
+            (should-not yeetube--continuation)
+            (let (fetched)
+              (cl-letf (((symbol-function 'yeetube--fetch)
+                         (lambda (&rest _) (setq fetched t))))
+                (should-error (yeetube-next-page) :type 'user-error))
+              (should-not fetched)))
           (should (string= "No more videos found" captured-message)))
       (when (buffer-live-p response-buffer)
         (kill-buffer response-buffer))
