@@ -707,7 +707,8 @@ WHAT is `videos', `streams', or `search' with a QUERY string."
   "R" ("Copy RSS feed" yeetube-copy-rss-feed-url)
   "b" ("Browse (invidious)" yeetube-browse-url)
   "d" ("Download" yeetube-download-video)
-  "o" ("Settings" :keymap yeetube-settings-map))
+  "o" ("Settings" :keymap yeetube-settings-map)
+  "q" ("Quit" quit-window))
 
 (define-derived-mode yeetube-mode tabulated-list-mode "Yeetube"
   "Yeetube mode."

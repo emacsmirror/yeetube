@@ -137,6 +137,10 @@
   "M-n is bound to yeetube-next-page."
   (should (eq 'yeetube-next-page (lookup-key yeetube-mode-map (kbd "M-n")))))
 
+(ert-deftest yeetube-test-keymap-q-bound-to-quit-window ()
+  "q is bound to quit-window."
+  (should (eq 'quit-window (lookup-key yeetube-mode-map "q"))))
+
 ;;; Group 7: channel browsing
 
 (ert-deftest yeetube-test-channel-videos-fetches-videos-tab ()
