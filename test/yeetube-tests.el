@@ -363,18 +363,16 @@ Return a cons of the resulting display text and captured message."
     (keymap-popup--collect-descriptions yeetube-settings-map)
     yeetube-settings-map)))
 
-(ert-deftest yeetube-test-video-switch-label ()
-  "Rendered settings show the video state exactly once."
+(ert-deftest yeetube-test-no-video-switch-label ()
+  "Rendered settings show the no-video switch state."
   (let ((yeetube-mpv-no-video nil)
         (yeetube-mpv-enable-torsocks nil))
-    (should (string-match-p "Video \\[on\\]" (yeetube-test--settings-menu-text)))
-    (should-not (string-match-p "Video \\[on\\] \\[off\\]"
-                                (yeetube-test--settings-menu-text))))
+    (should (string-match-p "No video \\[off\\]"
+                            (yeetube-test--settings-menu-text))))
   (let ((yeetube-mpv-no-video t)
         (yeetube-mpv-enable-torsocks nil))
-    (should (string-match-p "Video \\[off\\]" (yeetube-test--settings-menu-text)))
-    (should-not (string-match-p "Video \\[off\\] \\[on\\]"
-                                (yeetube-test--settings-menu-text)))))
+    (should (string-match-p "No video \\[on\\]"
+                            (yeetube-test--settings-menu-text)))))
 
 (provide 'yeetube-tests)
 ;;; yeetube-tests.el ends here

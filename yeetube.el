@@ -664,15 +664,6 @@ WHAT is `videos', `streams', or `search' with a QUERY string."
   (format "%s: %s" label
           (propertize (format "%s" value) 'face 'font-lock-constant-face)))
 
-(defun yeetube--video-switch-label ()
-  "Return the current video playback switch label."
-  (format "Video [%s]" (if yeetube-mpv-no-video "off" "on")))
-
-(defun yeetube--toggle-video ()
-  "Toggle video playback."
-  (interactive)
-  (setq yeetube-mpv-no-video (not yeetube-mpv-no-video)))
-
 (keymap-popup-define yeetube-settings-map
   "Yeetube settings menu."
   :description "Yeetube Settings"
@@ -692,7 +683,7 @@ WHAT is `videos', `streams', or `search' with a QUERY string."
                    "Audio format" (or yeetube--audio-format "none")))
        yeetube-set-audio-format :stay-open t)
   :group "Switches"
-  "n" (#'yeetube--video-switch-label yeetube--toggle-video :stay-open t)
+  "n" ("No video" :switch yeetube-mpv-no-video)
   "t" ("Torsocks" :switch yeetube-mpv-enable-torsocks))
 
 (keymap-popup-define yeetube-mode-map
