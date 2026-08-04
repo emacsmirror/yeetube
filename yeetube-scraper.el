@@ -432,12 +432,35 @@ Point is restored after parsing."
 
 ;;; Continuation response parser
 
+(defun yeetube-scraper--continuation-commands (json)
+  "Return continuation commands from all supported JSON response roots."
+  (cl-loop for key in '(onResponseReceivedCommands
+                        onResponseReceivedActions
+                        onResponseReceivedEndpoints)
+           append (alist-get key json)))
+
 (defun yeetube-scraper--continuation-action (commands)
   "Return first known continuation action alist from COMMANDS."
   (cl-some (lambda (cmd)
              (or (alist-get 'appendContinuationItemsAction cmd)
                  (alist-get 'reloadContinuationItemsCommand cmd)))
            commands))
+
+(defun yeetube-scraper--continuation-container (json)
+  "Return a grid or section-list continuation container from JSON."
+  (let ((contents (alist-get 'continuationContents json)))
+    (or (alist-get 'gridContinuation contents)
+        (alist-get 'sectionListContinuation contents))))
+
+(defun yeetube-scraper--container-continuation (container)
+  "Extract a continuation plist from CONTAINER, or nil."
+  (cl-some
+   (lambda (entry)
+     (when-let* ((data (or (alist-get 'nextContinuationData entry)
+                           (alist-get 'reloadContinuationData entry)))
+                 (token (alist-get 'continuation data)))
+       (list :token token :url "")))
+   (alist-get 'continuations container)))
 
 (defun yeetube-scraper--extract-continuation-items (cont-items)
   "Extract item plists from continuation CONT-ITEMS.
@@ -460,11 +483,15 @@ and bare videoRenderer / lockupViewModel entries."
 (defun yeetube-scraper-parse-continuation-response (json)
   "Parse a continuation/pagination JSON response.
 Return (:items ... :continuation ...)."
-  (let* ((commands (alist-get 'onResponseReceivedCommands json))
+  (let* ((commands (yeetube-scraper--continuation-commands json))
          (action (yeetube-scraper--continuation-action commands))
-         (cont-items (alist-get 'continuationItems action)))
+         (container (yeetube-scraper--continuation-container json))
+         (cont-items (or (alist-get 'continuationItems action)
+                         (alist-get 'items container)
+                         (alist-get 'contents container))))
     (list :items (yeetube-scraper--extract-continuation-items cont-items)
-          :continuation (yeetube-scraper--extract-continuation cont-items))))
+          :continuation (or (yeetube-scraper--extract-continuation cont-items)
+                            (yeetube-scraper--container-continuation container)))))
 
 (provide 'yeetube-scraper)
 ;;; yeetube-scraper.el ends here

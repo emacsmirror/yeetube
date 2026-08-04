@@ -333,6 +333,14 @@ Return a cons of the resulting display text and captured message."
       (when (get-buffer yeetube--buffer-name)
         (kill-buffer yeetube--buffer-name)))))
 
+(ert-deftest yeetube-test-continuation-inherits-missing-url ()
+  "Legacy continuation data reuses the current request URL."
+  (should
+   (equal '(:token "next" :url "/youtubei/v1/browse")
+          (yeetube--continuation-inherit-url
+           '(:token "next" :url "")
+           '(:token "old" :url "/youtubei/v1/browse")))))
+
 (ert-deftest yeetube-test-replay-rejects-unknown-title ()
   "Replay never calls the player for an unknown title."
   (let ((yeetube-history '((:title "Known" :url "https://example.com/known")))

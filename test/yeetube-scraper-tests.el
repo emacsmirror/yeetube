@@ -403,9 +403,9 @@ Uses vectors for JSON arrays, alists for objects."
 
 ;;; Group 6: continuation response shapes
 
-(defun yeetube-scraper-test--cont-json (commands)
-  "Wrap COMMANDS as an onResponseReceivedCommands continuation JSON."
-  `((onResponseReceivedCommands . ,commands)))
+(defun yeetube-scraper-test--cont-json (commands &optional root)
+  "Wrap COMMANDS under continuation response ROOT."
+  `((,(or root 'onResponseReceivedCommands) . ,commands)))
 
 (defun yeetube-scraper-test--append-action (items)
   "Build appendContinuationItemsAction command holding ITEMS."
@@ -460,31 +460,63 @@ Uses vectors for JSON arrays, alists for objects."
     (should (equal "lock1" (plist-get (cadr items) :id)))))
 
 (ert-deftest yeetube-scraper-test-cont-reload-command ()
-  "reloadContinuationItemsCommand parses the same items as append."
+  "Reload commands parse under each continuation response root."
   (let* ((vid `((videoRenderer
                  (videoId . "r1")
                  (title (runs ((text . "Reload")))))))
-         (sec `((itemSectionRenderer (contents . ,(list vid)))))
-         (json (yeetube-scraper-test--cont-json
-                (list (yeetube-scraper-test--reload-command (list sec)))))
-         (parsed (yeetube-scraper-parse-continuation-response json))
-         (items (plist-get parsed :items)))
-    (should (= 1 (length items)))
-    (should (equal "r1" (plist-get (car items) :id)))))
+         (sec `((itemSectionRenderer (contents . ,(list vid))))))
+    (dolist (root '(onResponseReceivedCommands
+                    onResponseReceivedActions
+                    onResponseReceivedEndpoints))
+      (let* ((json (yeetube-scraper-test--cont-json
+                    (list (yeetube-scraper-test--reload-command (list sec)))
+                    root))
+             (parsed (yeetube-scraper-parse-continuation-response json))
+             (items (plist-get parsed :items)))
+        (should (= 1 (length items)))
+        (should (equal "r1" (plist-get (car items) :id)))))))
 
 (ert-deftest yeetube-scraper-test-cont-non-first-append ()
-  "appendContinuationItemsAction after a leading unrelated command parses."
+  "Non-first append actions parse under each continuation response root."
   (let* ((vid `((videoRenderer
                  (videoId . "n2")
                  (title (runs ((text . "Second")))))))
+         (sec `((itemSectionRenderer (contents . ,(list vid))))))
+    (dolist (root '(onResponseReceivedCommands
+                    onResponseReceivedActions
+                    onResponseReceivedEndpoints))
+      (let* ((json (yeetube-scraper-test--cont-json
+                    (list '((unrelatedCommand (x . t)))
+                          (yeetube-scraper-test--append-action (list sec)))
+                    root))
+             (parsed (yeetube-scraper-parse-continuation-response json))
+             (items (plist-get parsed :items)))
+        (should (= 1 (length items)))
+        (should (equal "n2" (plist-get (car items) :id)))))))
+
+(ert-deftest yeetube-scraper-test-continuation-contents-containers ()
+  "Grid and section continuation containers yield items and next tokens."
+  (let* ((vid `((videoRenderer
+                 (videoId . "c1")
+                 (title (runs ((text . "Container")))))))
          (sec `((itemSectionRenderer (contents . ,(list vid)))))
-         (json (yeetube-scraper-test--cont-json
-                (list '((unrelatedCommand (x . t)))
-                      (yeetube-scraper-test--append-action (list sec)))))
-         (parsed (yeetube-scraper-parse-continuation-response json))
-         (items (plist-get parsed :items)))
-    (should (= 1 (length items)))
-    (should (equal "n2" (plist-get (car items) :id)))))
+         (continuations '(((nextContinuationData
+                            (continuation . "container_tok"))))))
+    (dolist (case `((gridContinuation items ,(list vid))
+                    (sectionListContinuation contents ,(list sec))))
+      (let* ((container-key (nth 0 case))
+             (items-key (nth 1 case))
+             (entries (nth 2 case))
+             (container (list
+                         (cons container-key
+                               (list (cons items-key entries)
+                                     (cons 'continuations continuations)))))
+             (json (list (cons 'continuationContents container)))
+             (parsed (yeetube-scraper-parse-continuation-response json)))
+        (should (equal "c1"
+                       (plist-get (car (plist-get parsed :items)) :id)))
+        (should (equal "container_tok"
+                       (plist-get (plist-get parsed :continuation) :token)))))))
 
 (ert-deftest yeetube-scraper-test-cont-token-still-extracted ()
   "Continuation token/url still extracted when present among cont items."

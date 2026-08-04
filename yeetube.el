@@ -589,6 +589,17 @@ and to paginate past YouTube's 15-entry RSS cap."
    (yeetube-backend-continuation-request yeetube-backend yeetube--continuation)
    #'yeetube--continuation-callback))
 
+(defun yeetube--continuation-inherit-url (continuation previous)
+  "Return CONTINUATION with a missing URL inherited from PREVIOUS."
+  (let ((url (plist-get continuation :url))
+        (previous-url (plist-get previous :url)))
+    (if (and continuation
+             (or (null url) (string-empty-p url))
+             (stringp previous-url)
+             (not (string-empty-p previous-url)))
+        (plist-put (copy-sequence continuation) :url previous-url)
+      continuation)))
+
 (defun yeetube--continuation-callback (status)
   "Append the parsed next page from a URL response with STATUS."
   (let* ((result (yeetube--parse-response
@@ -599,7 +610,10 @@ and to paginate past YouTube's 15-entry RSS cap."
      (items
       (with-current-buffer yeetube--buffer-name
         (setq yeetube-items (append yeetube-items items))
-        (setq-local yeetube--continuation (plist-get result :continuation))
+        (setq-local yeetube--continuation
+                    (yeetube--continuation-inherit-url
+                     (plist-get result :continuation)
+                     yeetube--continuation))
         (yeetube-ui-append items)
         (yeetube-ui-fetch-thumbnails items yeetube--buffer-name)
         (yeetube--auto-paginate (yeetube--current-limit))))
