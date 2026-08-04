@@ -75,12 +75,12 @@ DESC falls back to URL when nil."
 (defun yeetube-ol-follow-video (path _prefix)
   "Play the yeetube video with id PATH."
   (funcall yeetube-play-function
-           (yeetube-backend-item-url 'youtube path 'video)))
+           (yeetube-backend-item-url yeetube-backend path 'video)))
 
 (defun yeetube-ol-export-video (path desc backend _channel)
   "Export a yt-video: link to BACKEND.
 PATH is the video id; DESC the user-visible label."
-  (yeetube-ol--export (yeetube-backend-item-url 'youtube path 'video)
+  (yeetube-ol--export (yeetube-backend-item-url yeetube-backend path 'video)
                       desc backend))
 
 (defun yeetube-ol-store-playlist-link (&optional _interactive)
@@ -91,12 +91,12 @@ PATH is the video id; DESC the user-visible label."
   "Display the yeetube playlist with id PATH."
   (yeetube--display-loading)
   (yeetube-display-content-from-url
-   (yeetube-backend-item-url 'youtube path 'playlist)))
+   (yeetube-backend-item-url yeetube-backend path 'playlist)))
 
 (defun yeetube-ol-export-playlist (path desc backend _channel)
   "Export a yt-playlist: link to BACKEND.
 PATH is the playlist id; DESC the user-visible label."
-  (yeetube-ol--export (yeetube-backend-item-url 'youtube path 'playlist)
+  (yeetube-ol--export (yeetube-backend-item-url yeetube-backend path 'playlist)
                       desc backend))
 
 (org-link-set-parameters "yt-video"
