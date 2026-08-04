@@ -93,13 +93,14 @@ the smallest image."
 ;;; lockupViewModel helpers (shared by video and playlist extraction)
 
 (defun yeetube-scraper--lockup-metadata-parts (renderer)
-  "Return metadataParts list from the first row of a lockupViewModel RENDERER."
+  "Return metadataParts from all rows of a lockupViewModel RENDERER."
   (let* ((meta (alist-get 'lockupMetadataViewModel
                           (alist-get 'metadata renderer)))
          (cmvm (alist-get 'contentMetadataViewModel
                           (alist-get 'metadata meta)))
          (rows (alist-get 'metadataRows cmvm)))
-    (alist-get 'metadataParts (car rows))))
+    (cl-loop for row in rows
+             append (alist-get 'metadataParts row))))
 
 (defun yeetube-scraper--lockup-part-text (part)
   "Return the text content from a single metadataParts PART, or nil."
@@ -115,6 +116,7 @@ absent fields."
       (let ((text (yeetube-scraper--lockup-part-text part)))
         (cond ((null text))
               ((string-match-p "view" text) (setq views text))
+              ((yeetube-scraper--lockup-browse-endpoint part))
               (t (setq date (or date text))))))
     (cons (or views "") (or date ""))))
 

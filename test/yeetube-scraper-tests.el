@@ -537,7 +537,9 @@ Uses vectors for JSON arrays, alists for objects."
          (result (yeetube-scraper--dispatch-item item)))
     (should (equal "ChanName" (plist-get result :channel)))
     (should (equal "/@chan" (plist-get result :channel-id)))
-    (should (equal "UCabc" (plist-get result :browse-id)))))
+    (should (equal "UCabc" (plist-get result :browse-id)))
+    (should (equal "10 views" (plist-get result :views)))
+    (should (equal "1 day ago" (plist-get result :date)))))
 
 (ert-deftest yeetube-scraper-test-lockup-channel-empty-without-source ()
   "VIDEO lockup identity stays empty when neither JSON nor defaults apply."
