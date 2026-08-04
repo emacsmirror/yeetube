@@ -55,6 +55,12 @@
     (should (equal "https://youtube.com/playlist?list=PLxyz"
                    (yeetube-get-url "PLxyz" 'playlist)))))
 
+(ert-deftest yeetube-test-get-url-requires-entry-id ()
+  "Missing or blank entry IDs never produce a bare watch URL."
+  (let ((yeetube-youtube-video-url "https://youtube.com/watch?v="))
+    (dolist (id '(nil ""))
+      (should-error (yeetube-get-url id 'video) :type 'user-error))))
+
 ;;; Group 4: yeetube-mpv-play returns a process (regression)
 
 (ert-deftest yeetube-test-mpv-play-returns-process ()
@@ -359,6 +365,91 @@ Return a cons of the resulting display text and captured message."
                (lambda (value &rest _) (setq command value))))
       (yeetube-download--ytdlp "https://example.com/video")
       (should (string-prefix-p "torsocks yt-dlp " command)))))
+
+(ert-deftest yeetube-test-download-omits-blank-output-name ()
+  "Blank output names omit -o; non-empty names stay shell-quoted."
+  (let ((yeetube-ytdlp-program "yt-dlp")
+        (yeetube-enable-tor nil)
+        commands)
+    (cl-letf (((symbol-function 'call-process-shell-command)
+               (lambda (value &rest _)
+                 (push value commands)
+                 0)))
+      (yeetube-download--ytdlp "https://example.com/video" nil)
+      (yeetube-download--ytdlp "https://example.com/video" "")
+      (yeetube-download--ytdlp "https://example.com/video" "my file.mp4")
+      (setf commands (nreverse commands))
+      (should-not (string-match-p " -o " (nth 0 commands)))
+      (should-not (string-match-p " -o " (nth 1 commands)))
+      (should (string-match-p
+               (concat " -o " (regexp-quote
+                               (shell-quote-argument "my file.mp4")))
+               (nth 2 commands))))))
+
+(ert-deftest yeetube-test-download-quotes-program-and-torsocks ()
+  "Spaced yt-dlp and torsocks paths remain single shell tokens."
+  (let ((yeetube-ytdlp-program "/opt/my yt-dlp/bin/yt-dlp")
+        (yeetube-enable-tor t)
+        (yeetube-torsocks-program "/opt/my torsocks/bin/torsocks")
+        command)
+    (cl-letf (((symbol-function 'call-process-shell-command)
+               (lambda (value &rest _) (setq command value) 0)))
+      (yeetube-download--ytdlp "https://example.com/video")
+      (should (string-prefix-p
+               (concat (shell-quote-argument yeetube-torsocks-program) " "
+                       (shell-quote-argument yeetube-ytdlp-program) " ")
+               command))
+      (should-not (string-match-p "^/opt/my torsocks/" command)))))
+
+(ert-deftest yeetube-test-play-copy-download-require-entry-id ()
+  "Play, copy, and download fail closed without a tabulated entry id."
+  (let ((yeetube-youtube-video-url "https://youtube.com/watch?v=")
+        (yeetube-items nil)
+        (yeetube-history nil)
+        played killed downloaded)
+    (cl-letf (((symbol-function 'tabulated-list-get-id) (lambda () nil))
+              ((symbol-function 'derived-mode-p)
+               (lambda (&rest _) t))
+              (yeetube-play-function
+               (lambda (&rest args) (setq played args)))
+              ((symbol-function 'kill-new)
+               (lambda (value) (setq killed value)))
+              ((symbol-function 'yeetube-download--ytdlp)
+               (lambda (&rest args) (setq downloaded args))))
+      (should-error (yeetube-play) :type 'user-error)
+      (should-not played)
+      (should-error (yeetube-copy-url) :type 'user-error)
+      (should-not killed)
+      (should-error (yeetube-download-video) :type 'user-error)
+      (should-not downloaded))))
+
+(ert-deftest yeetube-test-play-copy-download-use-real-entry-id ()
+  "Play, copy, and download act on the tabulated entry id."
+  (let ((yeetube-youtube-video-url "https://youtube.com/watch?v=")
+        (yeetube-items '((:id "abc" :title "Clip" :type video)))
+        (yeetube-history nil)
+        (yeetube-mpv-modeline-mode nil)
+        (yeetube-download-directory default-directory)
+        (yeetube--download-directory nil)
+        (yeetube--audio-format nil)
+        (yeetube-download-audio-format nil)
+        played killed downloaded)
+    (cl-letf (((symbol-function 'tabulated-list-get-id) (lambda () "abc"))
+              ((symbol-function 'derived-mode-p)
+               (lambda (&rest _) t))
+              (yeetube-play-function
+               (lambda (&rest args) (setq played args)))
+              ((symbol-function 'kill-new)
+               (lambda (value) (setq killed value)))
+              ((symbol-function 'yeetube-download--ytdlp)
+               (lambda (&rest args) (setq downloaded args))))
+      (yeetube-play)
+      (should (equal played '("https://youtube.com/watch?v=abc")))
+      (yeetube-copy-url)
+      (should (equal killed "https://youtube.com/watch?v=abc"))
+      (yeetube-download-video)
+      (should (equal (car downloaded)
+                     "https://youtube.com/watch?v=abc")))))
 
 (defun yeetube-test--settings-menu-text ()
   "Return the fully rendered settings menu text."

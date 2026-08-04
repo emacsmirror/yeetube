@@ -213,10 +213,13 @@ through tor when `yeetube-enable-tor' is non-nil."
                    'silent 'inhibit-cookies))))
 
 (defun yeetube-get-url (&optional id type)
-  "Get video or playlist URL for entry ID, adjusted for TYPE."
+  "Get video or playlist URL for entry ID, adjusted for TYPE.
+Signal `user-error' when no non-empty entry ID is available."
   (let* ((id (or id (tabulated-list-get-id)))
          (item (yeetube--find-item id))
          (type (or type (plist-get item :type) 'video)))
+    (unless (and (stringp id) (not (string-empty-p id)))
+      (user-error "No entry at point"))
     (yeetube-backend-item-url yeetube-backend id type)))
 
 (defun yeetube-channel-id-at-point ()
