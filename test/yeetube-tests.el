@@ -401,14 +401,31 @@ Return a cons of the resulting display text and captured message."
                command))
       (should-not (string-match-p "^/opt/my torsocks/" command)))))
 
+(defun yeetube-test--with-tabulated-entry (id body)
+  "Call BODY in a temp tabulated-list buffer with entry ID or none."
+  (with-temp-buffer
+    (tabulated-list-mode)
+    (setq tabulated-list-format [("Title" 10 t)])
+    (setq tabulated-list-entries
+          (and id (list (list id (vector "Clip")))))
+    (tabulated-list-init-header)
+    (tabulated-list-print t)
+    (when id
+      (goto-char (point-min))
+      (while (and (not (eobp))
+                  (not (equal (get-text-property (point) 'tabulated-list-id)
+                              id)))
+        (forward-line 1))
+      (should (equal (get-text-property (point) 'tabulated-list-id) id)))
+    (funcall body)))
+
 (ert-deftest yeetube-test-play-copy-download-require-entry-id ()
   "Play, copy, and download fail closed without a tabulated entry id."
   (let ((yeetube-youtube-video-url "https://youtube.com/watch?v=")
         (yeetube-items nil)
         (yeetube-history nil)
         played killed downloaded)
-    (cl-letf (((symbol-function 'tabulated-list-get-id) (lambda () nil))
-              ((symbol-function 'derived-mode-p)
+    (cl-letf (((symbol-function 'derived-mode-p)
                (lambda (&rest _) t))
               (yeetube-play-function
                (lambda (&rest args) (setq played args)))
@@ -416,12 +433,15 @@ Return a cons of the resulting display text and captured message."
                (lambda (value) (setq killed value)))
               ((symbol-function 'yeetube-download--ytdlp)
                (lambda (&rest args) (setq downloaded args))))
-      (should-error (yeetube-play) :type 'user-error)
-      (should-not played)
-      (should-error (yeetube-copy-url) :type 'user-error)
-      (should-not killed)
-      (should-error (yeetube-download-video) :type 'user-error)
-      (should-not downloaded))))
+      (yeetube-test--with-tabulated-entry
+       nil
+       (lambda ()
+         (should-error (yeetube-play) :type 'user-error)
+         (should-not played)
+         (should-error (yeetube-copy-url) :type 'user-error)
+         (should-not killed)
+         (should-error (yeetube-download-video) :type 'user-error)
+         (should-not downloaded))))))
 
 (ert-deftest yeetube-test-play-copy-download-use-real-entry-id ()
   "Play, copy, and download act on the tabulated entry id."
@@ -434,8 +454,7 @@ Return a cons of the resulting display text and captured message."
         (yeetube--audio-format nil)
         (yeetube-download-audio-format nil)
         played killed downloaded)
-    (cl-letf (((symbol-function 'tabulated-list-get-id) (lambda () "abc"))
-              ((symbol-function 'derived-mode-p)
+    (cl-letf (((symbol-function 'derived-mode-p)
                (lambda (&rest _) t))
               (yeetube-play-function
                (lambda (&rest args) (setq played args)))
@@ -443,13 +462,16 @@ Return a cons of the resulting display text and captured message."
                (lambda (value) (setq killed value)))
               ((symbol-function 'yeetube-download--ytdlp)
                (lambda (&rest args) (setq downloaded args))))
-      (yeetube-play)
-      (should (equal played '("https://youtube.com/watch?v=abc")))
-      (yeetube-copy-url)
-      (should (equal killed "https://youtube.com/watch?v=abc"))
-      (yeetube-download-video)
-      (should (equal (car downloaded)
-                     "https://youtube.com/watch?v=abc")))))
+      (yeetube-test--with-tabulated-entry
+       "abc"
+       (lambda ()
+         (yeetube-play)
+         (should (equal played '("https://youtube.com/watch?v=abc")))
+         (yeetube-copy-url)
+         (should (equal killed "https://youtube.com/watch?v=abc"))
+         (yeetube-download-video)
+         (should (equal (car downloaded)
+                        "https://youtube.com/watch?v=abc")))))))
 
 (defun yeetube-test--settings-menu-text ()
   "Return the fully rendered settings menu text."
