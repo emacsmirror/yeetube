@@ -132,6 +132,10 @@
     (should (equal "https://inv.example.org/watch?v=abc"
                    (yeetube-backend-browse-url 'youtube "abc" 'video)))))
 
+(ert-deftest yeetube-youtube-test-default-invidious-instances-supported ()
+  "Default browsing uses only the reviewed supported Invidious host."
+  (should (equal yeetube-youtube-invidious-instances '("inv.nadeko.net"))))
+
 (ert-deftest yeetube-youtube-test-browse-url-selects-list-instance ()
   "A configured instance list uses the selected invidious host."
   (let ((yeetube-youtube-video-url "https://www.youtube.com/watch?v=")

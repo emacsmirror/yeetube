@@ -59,7 +59,7 @@ playlists from.")
 (define-obsolete-variable-alias 'yeetube-invidious-instances
   'yeetube-youtube-invidious-instances "2.4.0")
 (defvar yeetube-youtube-invidious-instances
-  '("inv.nadeko.net" "invidious.flokinet.to")
+  '("inv.nadeko.net")
   "Invidious instances used by `yeetube-browse-url'.
 Either a list to pick a random instance from, or a single
 instance as a string.")
