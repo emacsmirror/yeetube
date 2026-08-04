@@ -153,22 +153,33 @@ The vector layout depends on `yeetube-display-thumbnails-p'."
 ;;; Sort helpers
 
 (defun yeetube-ui--duration-to-seconds (duration)
-  "Convert DURATION string in HH:MM:SS format to total seconds."
-  (pcase (mapcar #'string-to-number (split-string duration ":"))
-    (`(,h ,m ,s) (+ (* h 3600) (* m 60) s))
-    (`(,m ,s) (+ (* m 60) s))
-    (`(,s) s)
-    (_ 0)))
+  "Convert HMS DURATION string to total seconds.
+Accepts `H:MM:SS', `M:SS', or bare seconds.  Non-HMS labels such as
+playlist counts (`3 videos'), `LIVE', or empty strings return 0 so
+duration sort treats them as unknown rather than a small positive
+value."
+  (if (or (not (stringp duration))
+          (string-empty-p duration)
+          (not (string-match-p "\\`[0-9]+\\(?::[0-9][0-9]\\)*\\'" duration)))
+      0
+    (pcase (mapcar #'string-to-number (split-string duration ":"))
+      (`(,h ,m ,s) (+ (* h 3600) (* m 60) s))
+      (`(,m ,s) (+ (* m 60) s))
+      (`(,s) s)
+      (_ 0))))
 
 (defun yeetube-ui--parse-relative-date (date)
-  "Convert DATE to comparable seconds.
+  "Convert DATE to comparable epoch seconds (older before newer).
 
 Handles two formats produced by the RSS and HTML sources:
 
   * ISO-8601 timestamps like \"2026-05-01T12:00:00+00:00\"
-    (RSS items), converted to epoch seconds with `date-to-time'.
-  * Relative strings like \"2 days ago\" (scraper items),
-    expanded to an approximate age in seconds."
+    (RSS items), converted with `date-to-time'.
+  * Relative strings like \"2 days ago\" (scraper items), converted
+    to an approximate absolute epoch by subtracting the age from
+    `float-time'.
+
+Unparseable relative units return 0."
   (if (string-match-p "\\`[0-9]\\{4\\}-" date)
       (float-time (date-to-time date))
     (let* ((split-date (split-string date " "))
@@ -184,7 +195,9 @@ Handles two formats produced by the RSS and HTML sources:
               ((or "month" "months")   2592000)
               ((or "year" "years")     31536000)
               (_ 0))))
-      (* value seconds-per-unit))))
+      (if (zerop seconds-per-unit)
+          0
+        (- (float-time) (* value seconds-per-unit))))))
 
 (defun yeetube-ui--sort-views (a b)
   "Sort entries A and B by view count."

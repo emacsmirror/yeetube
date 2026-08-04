@@ -72,35 +72,35 @@
   "Large duration converts correctly."
   (should (= 36610 (yeetube-ui--duration-to-seconds "10:10:10"))))
 
+(ert-deftest yeetube-ui-test-duration-to-seconds-playlist-count ()
+  "Playlist video-count labels are not treated as HMS seconds."
+  (should (= 0 (yeetube-ui--duration-to-seconds "3 videos")))
+  (should (= 0 (yeetube-ui--duration-to-seconds "15 videos"))))
+
+(ert-deftest yeetube-ui-test-duration-to-seconds-live-and-empty ()
+  "LIVE and empty duration labels sort as unknown (0)."
+  (should (= 0 (yeetube-ui--duration-to-seconds "LIVE")))
+  (should (= 0 (yeetube-ui--duration-to-seconds ""))))
+
+(ert-deftest yeetube-ui-test-sort-duration-playlist-after-unknown ()
+  "Playlist count does not sort ahead of multi-minute videos."
+  (let ((yeetube-display-thumbnails-p nil)
+        (playlist '("pl" ["P" "1" "3 videos" "1 day ago" "Ch"]))
+        (video '("v" ["V" "1" "3:00" "1 day ago" "Ch"])))
+    (should (yeetube-ui--sort-duration playlist video))
+    (should-not (yeetube-ui--sort-duration video playlist))))
+
 ;;; Group 3: yeetube-ui--parse-relative-date
+;;; Polarity: older-before-newer for relative, ISO, and mixed lists.
 
-(ert-deftest yeetube-ui-test-parse-relative-date-seconds ()
-  "Seconds parsed correctly."
-  (should (= 30 (yeetube-ui--parse-relative-date "30 seconds ago"))))
-
-(ert-deftest yeetube-ui-test-parse-relative-date-minutes ()
-  "Minutes parsed correctly."
-  (should (= 300 (yeetube-ui--parse-relative-date "5 minutes ago"))))
-
-(ert-deftest yeetube-ui-test-parse-relative-date-hours ()
-  "Hours parsed correctly."
-  (should (= 7200 (yeetube-ui--parse-relative-date "2 hours ago"))))
-
-(ert-deftest yeetube-ui-test-parse-relative-date-days ()
-  "Days parsed correctly."
-  (should (= 259200 (yeetube-ui--parse-relative-date "3 days ago"))))
-
-(ert-deftest yeetube-ui-test-parse-relative-date-weeks ()
-  "Weeks parsed correctly."
-  (should (= 604800 (yeetube-ui--parse-relative-date "1 week ago"))))
-
-(ert-deftest yeetube-ui-test-parse-relative-date-months ()
-  "Months parsed correctly (30-day month)."
-  (should (= 5184000 (yeetube-ui--parse-relative-date "2 months ago"))))
-
-(ert-deftest yeetube-ui-test-parse-relative-date-years ()
-  "Years parsed correctly (365-day year)."
-  (should (= 31536000 (yeetube-ui--parse-relative-date "1 year ago"))))
+(ert-deftest yeetube-ui-test-parse-relative-date-relative-ordered ()
+  "Relative ages share older-before-newer chronology."
+  (should (< (yeetube-ui--parse-relative-date "5 days ago")
+             (yeetube-ui--parse-relative-date "1 day ago")))
+  (should (< (yeetube-ui--parse-relative-date "2 hours ago")
+             (yeetube-ui--parse-relative-date "30 seconds ago")))
+  (should (< (yeetube-ui--parse-relative-date "1 year ago")
+             (yeetube-ui--parse-relative-date "1 week ago"))))
 
 (ert-deftest yeetube-ui-test-parse-relative-date-unknown-unit ()
   "Unknown unit returns 0."
@@ -114,6 +114,16 @@
   "Older ISO timestamps produce smaller values than newer ones."
   (should (< (yeetube-ui--parse-relative-date "2020-01-01T00:00:00+00:00")
              (yeetube-ui--parse-relative-date "2026-05-01T12:00:00+00:00"))))
+
+(ert-deftest yeetube-ui-test-parse-relative-date-mixed-chronology ()
+  "Mixed relative and ISO dates share one older-before-newer scale."
+  (let ((old-rel (yeetube-ui--parse-relative-date "10 years ago"))
+        (mid-iso (yeetube-ui--parse-relative-date "2020-01-01T00:00:00+00:00"))
+        (late-iso (yeetube-ui--parse-relative-date "2025-01-01T00:00:00+00:00"))
+        (new-rel (yeetube-ui--parse-relative-date "1 day ago")))
+    (should (< old-rel mid-iso))
+    (should (< mid-iso late-iso))
+    (should (< late-iso new-rel))))
 
 ;;; Group 4: yeetube-ui--entry-to-row
 
@@ -208,20 +218,28 @@
     (should-not (yeetube-ui--sort-duration b a))))
 
 (ert-deftest yeetube-ui-test-sort-date-with-thumbnails ()
-  "Sort by date works when thumbnails are enabled (index 4)."
+  "Sort by date is older-before-newer when thumbnails are enabled."
   (let ((yeetube-display-thumbnails-p t)
-        (a '("id1" ["thumb" "Title A" "100" "1:00" "1 day ago" "Ch"]))
-        (b '("id2" ["thumb" "Title B" "200" "2:00" "2 days ago" "Ch"])))
-    (should (yeetube-ui--sort-date a b))
-    (should-not (yeetube-ui--sort-date b a))))
+        (newer '("id1" ["thumb" "Title A" "100" "1:00" "1 day ago" "Ch"]))
+        (older '("id2" ["thumb" "Title B" "200" "2:00" "2 days ago" "Ch"])))
+    (should (yeetube-ui--sort-date older newer))
+    (should-not (yeetube-ui--sort-date newer older))))
 
 (ert-deftest yeetube-ui-test-sort-date-without-thumbnails ()
-  "Sort by date works when thumbnails are disabled (index 3)."
+  "Sort by date is older-before-newer when thumbnails are disabled."
   (let ((yeetube-display-thumbnails-p nil)
-        (a '("id1" ["Title A" "100" "1:00" "1 day ago" "Ch"]))
-        (b '("id2" ["Title B" "200" "2:00" "2 days ago" "Ch"])))
-    (should (yeetube-ui--sort-date a b))
-    (should-not (yeetube-ui--sort-date b a))))
+        (newer '("id1" ["Title A" "100" "1:00" "1 day ago" "Ch"]))
+        (older '("id2" ["Title B" "200" "2:00" "2 days ago" "Ch"])))
+    (should (yeetube-ui--sort-date older newer))
+    (should-not (yeetube-ui--sort-date newer older))))
+
+(ert-deftest yeetube-ui-test-sort-date-mixed-iso-relative ()
+  "Date sort unifies ISO and relative values with older-before-newer."
+  (let ((yeetube-display-thumbnails-p nil)
+        (iso-old '("id1" ["A" "100" "1:00" "2020-01-01T00:00:00+00:00" "Ch"]))
+        (rel-new '("id2" ["B" "200" "2:00" "1 day ago" "Ch"])))
+    (should (yeetube-ui--sort-date iso-old rel-new))
+    (should-not (yeetube-ui--sort-date rel-new iso-old))))
 
 (ert-deftest yeetube-ui-test-default-sort-column-includes-date ()
   "Customize type offers Date alongside existing columns."
