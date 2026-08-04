@@ -29,14 +29,14 @@
                    || lib.hasSuffix "~" name);
           };
 
-          keymapPopupVersion = "0.3.1";
+          keymapPopupVersion = "0.4.1";
 
           keymapPopup = emacsPackages.trivialBuild {
             pname = "keymap-popup";
             version = keymapPopupVersion;
             src = pkgs.fetchurl {
               url = "https://elpa.gnu.org/packages/keymap-popup-${keymapPopupVersion}.tar";
-              hash = "sha256-C+ECWpChsO6MUG+oAPJDhZruWphkxy7VLe9YFAzShFQ=";
+              hash = "sha256-O2t6v0b8xknkevzXu6uu+M/ZiqPhcN/g5MytxKF4DkU=";
             };
             packageRequires = [ ];
           };
