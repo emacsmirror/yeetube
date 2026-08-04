@@ -241,6 +241,14 @@
     (should (yeetube-ui--sort-date iso-old rel-new))
     (should-not (yeetube-ui--sort-date rel-new iso-old))))
 
+(ert-deftest yeetube-ui-test-sort-date-equal-relative ()
+  "Equal relative dates do not compare less in either direction."
+  (let ((yeetube-display-thumbnails-p nil)
+        (a '("id1" ["A" "100" "1:00" "1 day ago" "Ch"]))
+        (b '("id2" ["B" "200" "2:00" "1 day ago" "Ch"])))
+    (should-not (yeetube-ui--sort-date a b))
+    (should-not (yeetube-ui--sort-date b a))))
+
 (ert-deftest yeetube-ui-test-default-sort-column-includes-date ()
   "Customize type offers Date alongside existing columns."
   (let ((type (get 'yeetube-default-sort-column 'custom-type)))

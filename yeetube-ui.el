@@ -168,7 +168,7 @@ value."
       (`(,s) s)
       (_ 0))))
 
-(defun yeetube-ui--parse-relative-date (date)
+(defun yeetube-ui--parse-relative-date (date &optional now)
   "Convert DATE to comparable epoch seconds (older before newer).
 
 Handles two formats produced by the RSS and HTML sources:
@@ -176,8 +176,8 @@ Handles two formats produced by the RSS and HTML sources:
   * ISO-8601 timestamps like \"2026-05-01T12:00:00+00:00\"
     (RSS items), converted with `date-to-time'.
   * Relative strings like \"2 days ago\" (scraper items), converted
-    to an approximate absolute epoch by subtracting the age from
-    `float-time'.
+    to an approximate absolute epoch by subtracting the age from NOW,
+    which defaults to `float-time'.
 
 Unparseable relative units return 0."
   (if (string-match-p "\\`[0-9]\\{4\\}-" date)
@@ -197,7 +197,7 @@ Unparseable relative units return 0."
               (_ 0))))
       (if (zerop seconds-per-unit)
           0
-        (- (float-time) (* value seconds-per-unit))))))
+        (- (or now (float-time)) (* value seconds-per-unit))))))
 
 (defun yeetube-ui--sort-views (a b)
   "Sort entries A and B by view count."
@@ -216,8 +216,9 @@ Unparseable relative units return 0."
 (defun yeetube-ui--sort-date (a b)
   "Sort entries A and B by relative date."
   (let* ((idx (yeetube-ui--column-index "date"))
-         (date-a (yeetube-ui--parse-relative-date (aref (cadr a) idx)))
-         (date-b (yeetube-ui--parse-relative-date (aref (cadr b) idx))))
+         (now (float-time))
+         (date-a (yeetube-ui--parse-relative-date (aref (cadr a) idx) now))
+         (date-b (yeetube-ui--parse-relative-date (aref (cadr b) idx) now)))
     (< date-a date-b)))
 
 
