@@ -247,7 +247,7 @@ Unparseable relative units return 0."
           tabulated-list-sort-key
           (when yeetube-default-sort-column
             (cons yeetube-default-sort-column
-                  yeetube-default-sort-ascending)))
+                  (not yeetube-default-sort-ascending))))
     (tabulated-list-init-header)
     (tabulated-list-print)))
 

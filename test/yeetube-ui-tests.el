@@ -260,17 +260,21 @@
     (should (member '(const "Channel") (cdr type)))))
 
 (ert-deftest yeetube-ui-test-render-default-sort-date ()
-  "Default Date sort sets tabulated-list-sort-key without error."
-  (let ((yeetube-default-sort-column "Date")
-        (yeetube-default-sort-ascending nil)
-        (yeetube-display-thumbnails-p nil)
-        (yeetube-content nil))
-    (with-temp-buffer
-      (tabulated-list-mode)
-      (yeetube-ui-render
-       (list '(:id "a" :title "T" :views "1" :duration "1:00"
-                   :date "1 day ago" :channel "C" :type video)))
-      (should (equal tabulated-list-sort-key '("Date" . nil))))))
+  "Default Date sort honors ascending and descending user values."
+  (dolist (case '((t ("old" "new"))
+                  (nil ("new" "old"))))
+    (let ((yeetube-default-sort-column "Date")
+          (yeetube-default-sort-ascending (car case))
+          (yeetube-display-thumbnails-p nil)
+          (yeetube-content nil))
+      (with-temp-buffer
+        (tabulated-list-mode)
+        (yeetube-ui-render
+         (list '(:id "new" :title "New" :views "1" :duration "1:00"
+                     :date "1 day ago" :channel "C" :type video)
+               '(:id "old" :title "Old" :views "1" :duration "1:00"
+                     :date "2 days ago" :channel "C" :type video)))
+        (should (equal (mapcar #'car tabulated-list-entries) (cadr case)))))))
 
 ;;; Group 6: Thumbnail image callback
 
