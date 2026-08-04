@@ -62,6 +62,47 @@
       (yeetube-mpv-play "https://example.com/video")
       (should (string-prefix-p "torsocks mpv " command)))))
 
+(ert-deftest yeetube-mpv-test-additional-flags-are-shell-quoted ()
+  "Additional mpv flags with spaces stay single shell tokens."
+  (let ((yeetube-mpv-enable-torsocks nil)
+        (yeetube-mpv-program "mpv")
+        (yeetube-mpv-video-quality "720")
+        (yeetube-mpv-no-video nil)
+        (yeetube-mpv-additional-flags '("--title=My Title" "--foo bar"))
+        command)
+    (cl-letf (((symbol-function 'yeetube-mpv-check) #'ignore)
+              ((symbol-function 'yeetube-mpv-process)
+               (lambda (value)
+                 (setf command value))))
+      (yeetube-mpv-play "https://example.com/video")
+      (should (string-match-p
+               (regexp-quote (shell-quote-argument "--title=My Title"))
+               command))
+      (should (string-match-p
+               (regexp-quote (shell-quote-argument "--foo bar"))
+               command))
+      (should-not (string-match-p " --title=My Title " command)))))
+
+(ert-deftest yeetube-mpv-test-program-and-torsocks-are-shell-quoted ()
+  "Spaced mpv and torsocks paths remain single shell tokens."
+  (let ((yeetube-mpv-enable-torsocks t)
+        (yeetube-torsocks-program "/opt/my torsocks/bin/torsocks")
+        (yeetube-mpv-program "/opt/my mpv/bin/mpv")
+        (yeetube-mpv-video-quality "720")
+        (yeetube-mpv-no-video nil)
+        (yeetube-mpv-additional-flags nil)
+        command)
+    (cl-letf (((symbol-function 'yeetube-mpv-check) #'ignore)
+              ((symbol-function 'yeetube-mpv-process)
+               (lambda (value)
+                 (setf command value))))
+      (yeetube-mpv-play "https://example.com/video")
+      (should (string-prefix-p
+               (concat (shell-quote-argument yeetube-torsocks-program) " "
+                       (shell-quote-argument yeetube-mpv-program) " ")
+               command))
+      (should-not (string-match-p "^/opt/my torsocks/" command)))))
+
 ;;; Process sentinel: clears modeline state on exit
 
 (ert-deftest yeetube-mpv-test-sentinel-clears-on-exit ()

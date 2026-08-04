@@ -100,18 +100,21 @@ it to play local files."
              (or (null yeetube-torsocks-program)
                  (string= yeetube-torsocks-program "")))
     (user-error "Torsocks program not found; install torsocks or disable torsocks"))
+  (yeetube-mpv-check)
   (let* ((base-flags (remove "--no-video" yeetube-mpv-additional-flags))
          (flags (append (when yeetube-mpv-no-video '("--no-video"))
                         base-flags))
          (command
           (concat (when yeetube-mpv-enable-torsocks
-                    (concat yeetube-torsocks-program " "))
-                  yeetube-mpv-program " --ytdl-format="
+                    (concat (shell-quote-argument yeetube-torsocks-program)
+                            " "))
+                  (shell-quote-argument yeetube-mpv-program)
+                  " --ytdl-format="
                   (yeetube-mpv-ytdl-format-video-quality yeetube-mpv-video-quality)
                   " "
                   (shell-quote-argument input)
                   (when flags
-                    (concat " " (string-join flags " ")))))
+                    (concat " " (mapconcat #'shell-quote-argument flags " ")))))
          (proc (yeetube-mpv-process command)))
     (message "Yeetube command: %s" command)
     (message (if yeetube-mpv-enable-torsocks
