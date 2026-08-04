@@ -139,10 +139,44 @@ absent fields."
                         (alist-get 'thumbnailViewModel
                                    (alist-get 'contentImage renderer)))))
 
+(defun yeetube-scraper--lockup-browse-endpoint (part)
+  "Return browseEndpoint alist from lockup metadata PART, or nil."
+  (or (alist-get 'browseEndpoint
+                 (alist-get 'navigationEndpoint
+                            (alist-get 'text part)))
+      (alist-get 'browseEndpoint
+                 (alist-get 'innertubeCommand
+                            (alist-get 'onTap
+                                       (car (alist-get 'commandRuns
+                                                      (alist-get 'text part))))))))
+
+(defun yeetube-scraper--lockup-channel-identity (renderer)
+  "Return (:channel C :channel-id ID :browse-id B) from lockup RENDERER.
+Missing fields are empty strings."
+  (let* ((meta (alist-get 'lockupMetadataViewModel
+                          (alist-get 'metadata renderer)))
+         (rows (alist-get 'metadataRows
+                          (alist-get 'contentMetadataViewModel
+                                     (alist-get 'metadata meta))))
+         (channel "")
+         (channel-id "")
+         (browse-id ""))
+    (catch 'found
+      (dolist (row rows)
+        (dolist (part (alist-get 'metadataParts row))
+          (when-let* ((endpoint (yeetube-scraper--lockup-browse-endpoint part)))
+            (setq channel (or (yeetube-scraper--lockup-part-text part) "")
+                  channel-id (or (alist-get 'canonicalBaseUrl endpoint) "")
+                  browse-id (or (alist-get 'browseId endpoint) ""))
+            (throw 'found nil)))))
+    (list :channel channel :channel-id channel-id :browse-id browse-id)))
+
 (defun yeetube-scraper--extract-video-lockup (renderer)
   "Extract a video plist from a VIDEO-type lockupViewModel RENDERER alist.
 YouTube migrated channel-tab video rows from videoRenderer to this
-lockup shape in 2025."
+lockup shape in 2025.  Channel identity is filled when metadata parts
+carry a browse endpoint; otherwise fields stay empty for page-context
+defaults to fill."
   (let* ((id (alist-get 'contentId renderer))
          (title (alist-get 'content
                            (alist-get 'title
@@ -150,6 +184,7 @@ lockup shape in 2025."
                                                  (alist-get 'metadata renderer)))))
          (parts (yeetube-scraper--lockup-metadata-parts renderer))
          (vd (yeetube-scraper--lockup-views-and-date parts))
+         (identity (yeetube-scraper--lockup-channel-identity renderer))
          (thumb-url (yeetube-scraper--thumbnail-url
                      id (yeetube-scraper--lockup-thumbnails renderer))))
     (list :id id
@@ -157,9 +192,9 @@ lockup shape in 2025."
           :views (car vd)
           :duration (or (yeetube-scraper--lockup-duration renderer) "")
           :date (cdr vd)
-          :channel ""
-          :channel-id ""
-          :browse-id ""
+          :channel (plist-get identity :channel)
+          :channel-id (plist-get identity :channel-id)
+          :browse-id (plist-get identity :browse-id)
           :thumbnail-url (or thumb-url "")
           :type 'video)))
 
@@ -276,6 +311,64 @@ lockupViewModel (current YouTube layout), so dispatch through
            for plist = (and inner (yeetube-scraper--dispatch-item inner))
            when plist collect plist))
 
+(defun yeetube-scraper--empty-string-p (value)
+  "Return non-nil when VALUE is nil or an empty string."
+  (or (null value) (and (stringp value) (string-empty-p value))))
+
+(defun yeetube-scraper-fill-channel-identity (items identity)
+  "Return ITEMS with empty channel fields filled from IDENTITY plist.
+IDENTITY keys are `:channel', `:channel-id', and `:browse-id'.
+Nil IDENTITY is a no-op.  Non-empty item fields are preserved."
+  (if (null identity)
+      items
+    (mapcar
+     (lambda (item)
+       (list :id (plist-get item :id)
+             :title (plist-get item :title)
+             :views (plist-get item :views)
+             :duration (plist-get item :duration)
+             :date (plist-get item :date)
+             :channel (if (yeetube-scraper--empty-string-p
+                           (plist-get item :channel))
+                          (or (plist-get identity :channel) "")
+                        (plist-get item :channel))
+             :channel-id (if (yeetube-scraper--empty-string-p
+                              (plist-get item :channel-id))
+                             (or (plist-get identity :channel-id) "")
+                           (plist-get item :channel-id))
+             :browse-id (if (yeetube-scraper--empty-string-p
+                             (plist-get item :browse-id))
+                            (or (plist-get identity :browse-id) "")
+                          (plist-get item :browse-id))
+             :thumbnail-url (plist-get item :thumbnail-url)
+             :type (plist-get item :type)))
+     items)))
+
+(defun yeetube-scraper--vanity-channel-id (url)
+  "Return a yeetube channel-id path from vanity URL, or empty string."
+  (cond
+   ((not (stringp url)) "")
+   ((string-match "/\\(@[^/?#]+\\)" url)
+    (concat "/" (match-string 1 url)))
+   ((string-match "/channel/\\([^/?#]+\\)" url)
+    (concat "/channel/" (match-string 1 url)))
+   (t "")))
+
+(defun yeetube-scraper--channel-page-identity (json)
+  "Return channel identity plist from channel page JSON, or nil."
+  (when-let* ((meta (alist-get 'channelMetadataRenderer
+                               (alist-get 'metadata json)))
+              (browse-id (or (alist-get 'externalId meta) ""))
+              (title (or (alist-get 'title meta) ""))
+              (channel-id (yeetube-scraper--vanity-channel-id
+                           (alist-get 'vanityChannelUrl meta))))
+    (when (or (not (string-empty-p browse-id))
+              (not (string-empty-p title))
+              (not (string-empty-p channel-id)))
+      (list :channel title
+            :channel-id channel-id
+            :browse-id browse-id))))
+
 ;;; Page-type parsers
 
 (defun yeetube-scraper--parse-search (contents)
@@ -313,7 +406,8 @@ Return plist (:items ITEMS :continuation CONT)."
 
 (defun yeetube-scraper-parse ()
   "Parse ytInitialData from the current buffer.
-Return plist (:items ITEM-PLISTS :continuation (:token T :url U)).
+Return plist (:items ITEM-PLISTS :continuation (:token T :url U)
+             [:channel-identity IDENTITY]).
 Point is restored after parsing."
   (save-excursion
     (goto-char (point-min))
@@ -326,18 +420,48 @@ Point is restored after parsing."
        ((alist-get 'twoColumnSearchResultsRenderer contents)
         (yeetube-scraper--parse-search contents))
        ((alist-get 'twoColumnBrowseResultsRenderer contents)
-        (yeetube-scraper--parse-channel contents))
+        (let* ((parsed (yeetube-scraper--parse-channel contents))
+               (identity (yeetube-scraper--channel-page-identity json)))
+          (list :items (yeetube-scraper-fill-channel-identity
+                        (plist-get parsed :items) identity)
+                :continuation (plist-get parsed :continuation)
+                :channel-identity identity)))
        (t (list :items nil :continuation nil))))))
 
 ;;; Continuation response parser
+
+(defun yeetube-scraper--continuation-action (commands)
+  "Return first known continuation action alist from COMMANDS."
+  (cl-some (lambda (cmd)
+             (or (alist-get 'appendContinuationItemsAction cmd)
+                 (alist-get 'reloadContinuationItemsCommand cmd)))
+           commands))
+
+(defun yeetube-scraper--extract-continuation-items (cont-items)
+  "Extract item plists from continuation CONT-ITEMS.
+Handles itemSectionRenderer (search), richItemRenderer (channel grid),
+and bare videoRenderer / lockupViewModel entries."
+  (cl-loop for entry in cont-items
+           append
+           (cond
+            ((alist-get 'itemSectionRenderer entry)
+             (yeetube-scraper--extract-section-items (list entry)))
+            ((alist-get 'richItemRenderer entry)
+             (let* ((inner (alist-get 'content
+                                      (alist-get 'richItemRenderer entry)))
+                    (plist (and inner (yeetube-scraper--dispatch-item inner))))
+               (and plist (list plist))))
+            (t
+             (let ((plist (yeetube-scraper--dispatch-item entry)))
+               (and plist (list plist)))))))
 
 (defun yeetube-scraper-parse-continuation-response (json)
   "Parse a continuation/pagination JSON response.
 Return (:items ... :continuation ...)."
   (let* ((commands (alist-get 'onResponseReceivedCommands json))
-         (action (alist-get 'appendContinuationItemsAction (car commands)))
+         (action (yeetube-scraper--continuation-action commands))
          (cont-items (alist-get 'continuationItems action)))
-    (list :items (yeetube-scraper--extract-section-items cont-items)
+    (list :items (yeetube-scraper--extract-continuation-items cont-items)
           :continuation (yeetube-scraper--extract-continuation cont-items))))
 
 (provide 'yeetube-scraper)

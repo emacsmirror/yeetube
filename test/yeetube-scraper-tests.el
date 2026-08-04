@@ -401,5 +401,196 @@ Uses vectors for JSON arrays, alists for objects."
         (should (eq 'playlist (plist-get (cadr items) :type)))
         (should (equal "PLxxx" (plist-get (cadr items) :id)))))))
 
+;;; Group 6: continuation response shapes
+
+(defun yeetube-scraper-test--cont-json (commands)
+  "Wrap COMMANDS as an onResponseReceivedCommands continuation JSON."
+  `((onResponseReceivedCommands . ,commands)))
+
+(defun yeetube-scraper-test--append-action (items)
+  "Build appendContinuationItemsAction command holding ITEMS."
+  `((appendContinuationItemsAction
+     (continuationItems . ,items))))
+
+(defun yeetube-scraper-test--reload-command (items)
+  "Build reloadContinuationItemsCommand holding ITEMS."
+  `((reloadContinuationItemsCommand
+     (continuationItems . ,items))))
+
+(ert-deftest yeetube-scraper-test-cont-search-section-items ()
+  "Search-shaped first-append continuation still yields section items."
+  (let* ((vid `((videoRenderer
+                 (videoId . "s1")
+                 (title (runs ((text . "Search Vid")))))))
+         (sec `((itemSectionRenderer (contents . ,(list vid)))))
+         (json (yeetube-scraper-test--cont-json
+                (list (yeetube-scraper-test--append-action (list sec)))))
+         (parsed (yeetube-scraper-parse-continuation-response json))
+         (items (plist-get parsed :items)))
+    (should (= 1 (length items)))
+    (should (equal "s1" (plist-get (car items) :id)))))
+
+(ert-deftest yeetube-scraper-test-cont-richitem-lockup ()
+  "Channel-style richItem+lockup continuation yields items."
+  (let* ((lockup (yeetube-scraper-test--make-video-lockup
+                  "vid1" "Grid Cont" "9 views" "1 day ago" "1:11"))
+         (entry `((richItemRenderer (content . ,lockup))))
+         (json (yeetube-scraper-test--cont-json
+                (list (yeetube-scraper-test--append-action (list entry)))))
+         (parsed (yeetube-scraper-parse-continuation-response json))
+         (items (plist-get parsed :items)))
+    (should (= 1 (length items)))
+    (should (equal "vid1" (plist-get (car items) :id)))
+    (should (equal "Grid Cont" (plist-get (car items) :title)))))
+
+(ert-deftest yeetube-scraper-test-cont-bare-video-and-lockup ()
+  "Bare videoRenderer and VIDEO lockup continuation items dispatch."
+  (let* ((bare `((videoRenderer
+                  (videoId . "bare1")
+                  (title (runs ((text . "Bare")))))))
+         (lockup (yeetube-scraper-test--make-video-lockup
+                  "lock1" "Lock Cont" "1 views" "2 days ago" "0:30"))
+         (json (yeetube-scraper-test--cont-json
+                (list (yeetube-scraper-test--append-action
+                       (list bare lockup)))))
+         (parsed (yeetube-scraper-parse-continuation-response json))
+         (items (plist-get parsed :items)))
+    (should (= 2 (length items)))
+    (should (equal "bare1" (plist-get (car items) :id)))
+    (should (equal "lock1" (plist-get (cadr items) :id)))))
+
+(ert-deftest yeetube-scraper-test-cont-reload-command ()
+  "reloadContinuationItemsCommand parses the same items as append."
+  (let* ((vid `((videoRenderer
+                 (videoId . "r1")
+                 (title (runs ((text . "Reload")))))))
+         (sec `((itemSectionRenderer (contents . ,(list vid)))))
+         (json (yeetube-scraper-test--cont-json
+                (list (yeetube-scraper-test--reload-command (list sec)))))
+         (parsed (yeetube-scraper-parse-continuation-response json))
+         (items (plist-get parsed :items)))
+    (should (= 1 (length items)))
+    (should (equal "r1" (plist-get (car items) :id)))))
+
+(ert-deftest yeetube-scraper-test-cont-non-first-append ()
+  "appendContinuationItemsAction after a leading unrelated command parses."
+  (let* ((vid `((videoRenderer
+                 (videoId . "n2")
+                 (title (runs ((text . "Second")))))))
+         (sec `((itemSectionRenderer (contents . ,(list vid)))))
+         (json (yeetube-scraper-test--cont-json
+                (list '((unrelatedCommand (x . t)))
+                      (yeetube-scraper-test--append-action (list sec)))))
+         (parsed (yeetube-scraper-parse-continuation-response json))
+         (items (plist-get parsed :items)))
+    (should (= 1 (length items)))
+    (should (equal "n2" (plist-get (car items) :id)))))
+
+(ert-deftest yeetube-scraper-test-cont-token-still-extracted ()
+  "Continuation token/url still extracted when present among cont items."
+  (let* ((vid `((videoRenderer
+                 (videoId . "t1")
+                 (title (runs ((text . "Tok")))))))
+         (sec `((itemSectionRenderer (contents . ,(list vid)))))
+         (cont (yeetube-scraper-test--make-continuation
+                "next_tok" "/youtubei/v1/search"))
+         (json (yeetube-scraper-test--cont-json
+                (list (yeetube-scraper-test--append-action
+                       (list sec cont)))))
+         (parsed (yeetube-scraper-parse-continuation-response json))
+         (c (plist-get parsed :continuation)))
+    (should (equal "t1" (plist-get (car (plist-get parsed :items)) :id)))
+    (should (equal "next_tok" (plist-get c :token)))
+    (should (equal "/youtubei/v1/search" (plist-get c :url)))))
+
+;;; Group 7: lockup channel identity
+
+(defun yeetube-scraper-test--make-video-lockup-with-channel
+    (id title channel browse-id channel-path views date duration)
+  "Build VIDEO lockup including channel identity in metadata."
+  (let ((item (yeetube-scraper-test--make-video-lockup
+               id title views date duration)))
+    ;; Inject a channel metadata part with browseEndpoint before views/date.
+    (let* ((lockup (alist-get 'lockupViewModel item))
+           (meta (alist-get 'metadata lockup))
+           (lmvm (alist-get 'lockupMetadataViewModel meta))
+           (cm (alist-get 'metadata lmvm))
+           (cmvm (alist-get 'contentMetadataViewModel cm))
+           (rows (alist-get 'metadataRows cmvm))
+           (chan-part
+            `((text (content . ,channel)
+                    (commandRuns
+                     ((onTap
+                       (innertubeCommand
+                        (browseEndpoint
+                         (browseId . ,browse-id)
+                         (canonicalBaseUrl . ,channel-path))))))))))
+      (setf (alist-get 'metadataRows cmvm)
+            (cons `((metadataParts ,chan-part)) rows))
+      item)))
+
+(ert-deftest yeetube-scraper-test-lockup-channel-from-json ()
+  "VIDEO lockup extracts channel identity when metadata provides it."
+  (let* ((item (yeetube-scraper-test--make-video-lockup-with-channel
+                "L1" "T" "ChanName" "UCabc" "/@chan"
+                "10 views" "1 day ago" "1:00"))
+         (result (yeetube-scraper--dispatch-item item)))
+    (should (equal "ChanName" (plist-get result :channel)))
+    (should (equal "/@chan" (plist-get result :channel-id)))
+    (should (equal "UCabc" (plist-get result :browse-id)))))
+
+(ert-deftest yeetube-scraper-test-lockup-channel-empty-without-source ()
+  "VIDEO lockup identity stays empty when neither JSON nor defaults apply."
+  (let* ((item (yeetube-scraper-test--make-video-lockup
+                "L2" "T" "10 views" "1 day ago" "1:00"))
+         (result (yeetube-scraper--dispatch-item item)))
+    (should (equal "" (plist-get result :channel)))
+    (should (equal "" (plist-get result :channel-id)))
+    (should (equal "" (plist-get result :browse-id)))))
+
+(ert-deftest yeetube-scraper-test-fill-channel-identity ()
+  "Defaults fill only empty channel fields."
+  (let* ((empty '(:id "a" :channel "" :channel-id "" :browse-id "" :type video))
+         (partial '(:id "b" :channel "Have" :channel-id "" :browse-id "" :type video))
+         (full '(:id "c" :channel "C" :channel-id "/@c" :browse-id "UCc" :type video))
+         (defaults '(:channel "Def" :channel-id "/@def" :browse-id "UCdef"))
+         (out (yeetube-scraper-fill-channel-identity
+               (list empty partial full) defaults)))
+    (should (equal "Def" (plist-get (nth 0 out) :channel)))
+    (should (equal "/@def" (plist-get (nth 0 out) :channel-id)))
+    (should (equal "UCdef" (plist-get (nth 0 out) :browse-id)))
+    (should (equal "Have" (plist-get (nth 1 out) :channel)))
+    (should (equal "/@def" (plist-get (nth 1 out) :channel-id)))
+    (should (equal "UCdef" (plist-get (nth 1 out) :browse-id)))
+    (should (equal "C" (plist-get (nth 2 out) :channel)))
+    (should (equal "/@c" (plist-get (nth 2 out) :channel-id)))
+    (should (equal "UCc" (plist-get (nth 2 out) :browse-id)))))
+
+(ert-deftest yeetube-scraper-test-parse-channel-applies-page-identity ()
+  "Channel page header identity fills lockup rows lacking it."
+  (with-temp-buffer
+    (let* ((lockup (yeetube-scraper-test--make-video-lockup
+                    "chv1" "Chan Vid" "1 views" "1 day ago" "2:00"))
+           (rich `((richItemRenderer (content . ,lockup))))
+           (data (yeetube-scraper-test--make-channel-data (list rich) nil)))
+      ;; Real pages put identity under root metadata, not contents.
+      (setf data
+            (append
+             data
+             '((metadata
+                (channelMetadataRenderer
+                 (title . "PageChan")
+                 (externalId . "UCpage")
+                 (vanityChannelUrl . "https://www.youtube.com/@pagechan"))))))
+      (yeetube-scraper-test--insert-yt-initial-data data)
+      (let* ((result (yeetube-scraper-parse))
+             (item (car (plist-get result :items)))
+             (identity (plist-get result :channel-identity)))
+        (should (equal "chv1" (plist-get item :id)))
+        (should (equal "PageChan" (plist-get item :channel)))
+        (should (equal "/@pagechan" (plist-get item :channel-id)))
+        (should (equal "UCpage" (plist-get item :browse-id)))
+        (should (equal "UCpage" (plist-get identity :browse-id)))))))
+
 (provide 'yeetube-scraper-tests)
 ;;; yeetube-scraper-tests.el ends here

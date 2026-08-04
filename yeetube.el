@@ -129,7 +129,12 @@
   "List of scraped item plists.")
 
 (defvar-local yeetube--continuation nil
-  "Continuation plist for pagination.")
+  "Current continuation token plist for pagination, or nil.")
+
+(defvar-local yeetube--channel-context nil
+  "Channel identity for the current channel view, or nil.
+Plist keys are `:channel', `:channel-id', and `:browse-id'.
+Used to fill lockup rows that omit identity on channel pages.")
 
 (defvar-local yeetube-mpv-no-video nil
   "Non-nil means disable video playback in the current YeeTube buffer.")
@@ -413,8 +418,10 @@ Optionally, provide custom own URL."
 
 ;;; Search & Callbacks
 
-(defun yeetube--render-items (items limit &optional continuation)
+(defun yeetube--render-items (items limit &optional continuation channel-identity)
   "Render ITEMS into the *yeetube* buffer with LIMIT and CONTINUATION.
+CHANNEL-IDENTITY, when non-nil, is stored as the buffer's channel
+context for continuation fill and RSS/channel actions.
 Pops to the buffer per `yeetube-pop-to-same-window-p', resets the
 major mode, populates state, and kicks off thumbnail fetching."
   (let ((pop-fn (if yeetube-pop-to-same-window-p
@@ -428,6 +435,7 @@ major mode, populates state, and kicks off thumbnail fetching."
     (setq yeetube-items items)
     (setq-local yeetube--continuation continuation)
     (setq-local yeetube--results-limit limit)
+    (setq-local yeetube--channel-context channel-identity)
     (yeetube-ui-render items)
     (yeetube-ui-fetch-thumbnails items yeetube--buffer-name)))
 
@@ -436,6 +444,15 @@ major mode, populates state, and kicks off thumbnail fetching."
   (let ((buf (get-buffer yeetube--buffer-name)))
     (or (and buf (buffer-local-value 'yeetube--results-limit buf))
         yeetube-results-limit)))
+
+(defun yeetube--current-channel-context ()
+  "Return buffer-local channel identity for the *yeetube* buffer, or nil."
+  (when-let* ((buf (get-buffer yeetube--buffer-name)))
+    (buffer-local-value 'yeetube--channel-context buf)))
+
+(defun yeetube--apply-channel-context (items)
+  "Fill empty channel fields on ITEMS from the active channel context."
+  (yeetube-scraper-fill-channel-identity items (yeetube--current-channel-context)))
 
 (defun yeetube--decode-url-buffer (url-buffer)
   "Insert URL-BUFFER's body into the current buffer, decoded as UTF-8.
@@ -505,7 +522,9 @@ the decoded response body."
                   (lambda () (yeetube-backend-parse-page yeetube-backend))))
          (items (plist-get result :items)))
     (cond (items
-           (yeetube--render-items items limit (plist-get result :continuation))
+           (yeetube--render-items items limit
+                                  (plist-get result :continuation)
+                                  (plist-get result :channel-identity))
            (yeetube--auto-paginate limit))
           (result
            (yeetube--show-response-error yeetube--empty-results-message)))))
@@ -575,7 +594,7 @@ and to paginate past YouTube's 15-entry RSS cap."
   (let* ((result (yeetube--parse-response
                   status
                   (lambda () (yeetube-backend-parse-continuation yeetube-backend))))
-         (items (plist-get result :items)))
+         (items (yeetube--apply-channel-context (plist-get result :items))))
     (cond
      (items
       (with-current-buffer yeetube--buffer-name
