@@ -47,14 +47,17 @@ Optional values:
              (or (null yeetube-torsocks-program)
                  (string-empty-p yeetube-torsocks-program)))
     (user-error "Executable for torsocks not found"))
-  (let* ((tor-command (when yeetube-enable-tor yeetube-torsocks-program))
-         (name-command (when name (format "-o %s" (shell-quote-argument name))))
+  (let* ((tor-command (when yeetube-enable-tor
+                        (shell-quote-argument yeetube-torsocks-program)))
+         (name-command (when (and name (not (string-empty-p name)))
+                         (format "-o %s" (shell-quote-argument name))))
          (format-command (when audio-format
 			   (format "--extract-audio --audio-format %s"
 				   (shell-quote-argument audio-format))))
          (command (string-join (delq nil
                                      (list tor-command
-                                           yeetube-ytdlp-program
+                                           (shell-quote-argument
+                                            yeetube-ytdlp-program)
                                            (shell-quote-argument url)
                                            name-command format-command))
                                " ")))
