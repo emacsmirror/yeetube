@@ -223,6 +223,29 @@
     (should (yeetube-ui--sort-date a b))
     (should-not (yeetube-ui--sort-date b a))))
 
+(ert-deftest yeetube-ui-test-default-sort-column-includes-date ()
+  "Customize type offers Date alongside existing columns."
+  (let ((type (get 'yeetube-default-sort-column 'custom-type)))
+    (should (eq (car type) 'radio))
+    (should (member '(const "Date") (cdr type)))
+    (should (member '(const "Title") (cdr type)))
+    (should (member '(const "Views") (cdr type)))
+    (should (member '(const "Duration") (cdr type)))
+    (should (member '(const "Channel") (cdr type)))))
+
+(ert-deftest yeetube-ui-test-render-default-sort-date ()
+  "Default Date sort sets tabulated-list-sort-key without error."
+  (let ((yeetube-default-sort-column "Date")
+        (yeetube-default-sort-ascending nil)
+        (yeetube-display-thumbnails-p nil)
+        (yeetube-content nil))
+    (with-temp-buffer
+      (tabulated-list-mode)
+      (yeetube-ui-render
+       (list '(:id "a" :title "T" :views "1" :duration "1:00"
+                   :date "1 day ago" :channel "C" :type video)))
+      (should (equal tabulated-list-sort-key '("Date" . nil))))))
+
 ;;; Group 6: Thumbnail image callback
 
 (ert-deftest yeetube-ui-test-image-callback-persists-image-on-vector ()

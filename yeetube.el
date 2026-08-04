@@ -95,6 +95,7 @@
 		(const "Title")
                 (const "Views")
                 (const "Duration")
+                (const "Date")
                 (const "Channel")))
 
 (defcustom yeetube-default-sort-ascending nil
