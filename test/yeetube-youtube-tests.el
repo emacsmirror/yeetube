@@ -148,6 +148,11 @@
     (should-error (yeetube-backend-browse-url 'youtube "abc" 'video)
                   :type 'user-error)))
 
+(ert-deftest yeetube-youtube-test-default-invidious-excludes-dead-puffyan ()
+  "Default Invidious list omits the known-dead vid.puffyan.us host."
+  (should (consp yeetube-youtube-invidious-instances))
+  (should-not (member "vid.puffyan.us" yeetube-youtube-invidious-instances)))
+
 ;;; Group 6: channel input
 
 (ert-deftest yeetube-youtube-test-read-channel-errors-on-empty-input ()
