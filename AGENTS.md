@@ -62,13 +62,3 @@ git diff --check
 
 Focused ERT: one file from `TESTS` with project batch load-path. Green tests
 count only when assertions prove claimed behavior.
-
-## Contributions
-
-Patches: patches@thanosapollo.org — `[PATCH yeetube] Short description`.
-
-Bugs/features: bugs@thanosapollo.org — `[BUG yeetube] Short description`.
-
-Stage scoped verified files only. Short `area: Change` subjects. No
-generated-by or agent co-author metadata. No commit/amend/rebase/push/
-destructive Git without explicit authorization.
