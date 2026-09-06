@@ -141,6 +141,18 @@ WHAT is `videos', `streams', or `search' with a QUERY string."
                                     (clientVersion . ,yeetube-youtube--client-version)))
                    (continuation . ,(plist-get continuation :token)))))))
 
+(cl-defmethod yeetube-backend-next-continuation
+  ((_backend (eql 'youtube)) continuation previous)
+  "Return CONTINUATION with a missing URL inherited from PREVIOUS."
+  (let ((url (plist-get continuation :url))
+        (previous-url (plist-get previous :url)))
+    (if (and continuation
+             (or (null url) (string-empty-p url))
+             (stringp previous-url)
+             (not (string-empty-p previous-url)))
+        (plist-put (copy-sequence continuation) :url previous-url)
+      continuation)))
+
 ;;; Parsers
 
 (cl-defmethod yeetube-backend-parse-page ((_backend (eql 'youtube)))
@@ -206,15 +218,15 @@ WHAT is `videos', `streams', or `search' with a QUERY string."
 (defun yeetube-youtube--rss-entry-text (entry tag)
   "Return text for direct child TAG in RSS ENTRY, or an empty string."
   (or (when-let* ((node (dom-child-by-tag entry tag)))
-        ;; Not `dom-inner-text', which is new in Emacs 31.
-        (string-trim (dom-texts node "")))
+        ;; RSS text, using DOM primitives available before Emacs 31.
+        (string-trim (mapconcat #'identity (dom-strings node) "")))
       ""))
 
 (defun yeetube-youtube--rss-author-name (entry)
   "Return author name from RSS ENTRY, or an empty string."
   (or (when-let* ((author (dom-child-by-tag entry 'author))
                   (name (dom-child-by-tag author 'name)))
-        (string-trim (dom-texts name "")))
+        (string-trim (mapconcat #'identity (dom-strings name) "")))
       ""))
 
 (defun yeetube-youtube--rss-channel-path (browse-id)

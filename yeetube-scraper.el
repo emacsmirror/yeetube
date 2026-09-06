@@ -325,25 +325,10 @@ Nil IDENTITY is a no-op.  Non-empty item fields are preserved."
       items
     (mapcar
      (lambda (item)
-       (list :id (plist-get item :id)
-             :title (plist-get item :title)
-             :views (plist-get item :views)
-             :duration (plist-get item :duration)
-             :date (plist-get item :date)
-             :channel (if (yeetube-scraper--empty-string-p
-                           (plist-get item :channel))
-                          (or (plist-get identity :channel) "")
-                        (plist-get item :channel))
-             :channel-id (if (yeetube-scraper--empty-string-p
-                              (plist-get item :channel-id))
-                             (or (plist-get identity :channel-id) "")
-                           (plist-get item :channel-id))
-             :browse-id (if (yeetube-scraper--empty-string-p
-                             (plist-get item :browse-id))
-                            (or (plist-get identity :browse-id) "")
-                          (plist-get item :browse-id))
-             :thumbnail-url (plist-get item :thumbnail-url)
-             :type (plist-get item :type)))
+       (let ((copy (copy-sequence item)))
+         (dolist (key '(:channel :channel-id :browse-id) copy)
+           (when (yeetube-scraper--empty-string-p (plist-get copy key))
+             (setq copy (plist-put copy key (or (plist-get identity key) "")))))))
      items)))
 
 (defun yeetube-scraper--vanity-channel-id (url)

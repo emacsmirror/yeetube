@@ -5,15 +5,19 @@ NIX := $(shell command -v nix 2>/dev/null)
 ENV_MAKE = $(MAKE) --no-print-directory
 ifeq ($(YEETUBE_ENV_WRAPPED),)
 ifneq ($(NIX),)
-ENV_MAKE = nix develop path:$(CURDIR) --command env YEETUBE_ENV_WRAPPED=1 $(MAKE) --no-print-directory
+ENV_MAKE = nix develop path:$(CURDIR) --no-write-lock-file --command env YEETUBE_ENV_WRAPPED=1 $(MAKE) --no-print-directory
 endif
 endif
 
 EMACS_CMD ?= emacs
+EMACSCLIENT ?= emacsclient
 
-SRCS = yeetube.el yeetube-backend.el yeetube-youtube.el yeetube-scraper.el yeetube-ui.el yeetube-mpv.el yeetube-download.el yeetube-ol.el
+# Dependencies first, shared by compilation, lint and live reload.
+SRCS = yeetube-backend.el yeetube-scraper.el yeetube-youtube.el yeetube-ui.el yeetube-mpv.el yeetube-download.el yeetube.el yeetube-ol.el
 
-TESTS = test/yeetube-tests.el test/yeetube-youtube-tests.el test/yeetube-scraper-tests.el test/yeetube-ui-tests.el test/yeetube-mpv-tests.el test/yeetube-ol-tests.el
+TESTS = test/yeetube-tests.el test/yeetube-youtube-tests.el test/yeetube-scraper-tests.el test/yeetube-ui-tests.el test/yeetube-mpv-tests.el test/yeetube-ol-tests.el test/yeetube-tor-tests.el test/yeetube-lifecycle-tests.el test/yeetube-playback-tests.el test/yeetube-download-tests.el
+
+FIXTURES = test/fixtures/search-videorenderer.json test/fixtures/search-lockupviewmodel.json
 
 BATCH = $(EMACS_CMD) -Q --batch -L .
 
@@ -27,7 +31,7 @@ compile:
 do-compile:
 	@for f in $(SRCS); do \
 	  echo "Compiling $$f..."; \
-	  $(BATCH) -l $$f -f batch-byte-compile $$f || exit 1; \
+	  $(BATCH) --eval '(setq byte-compile-error-on-warn t)' -f batch-byte-compile $$f || exit 1; \
 	done
 
 test:
@@ -45,21 +49,21 @@ lint:
 do-lint:
 	@echo "Running checkdoc..."
 	@for f in $(SRCS); do \
-	  $(BATCH) --eval "(checkdoc-file \"$$f\")" || exit 1; \
+	  $(BATCH) -l checkdoc --eval "(progn (advice-add 'checkdoc-error :before (lambda (_point message) (error \"%s: %s\" \"$$f\" message))) (checkdoc-file \"$$f\"))" || exit 1; \
 	done
 
 dev: compile lint test
 
 load: clean
-	@emacsclient --eval "(progn \
+	@$(EMACSCLIENT) --eval "(progn \
 	  (add-to-list 'load-path \"$(CURDIR)\") \
 	  (dolist (sym '(yeetube-mode-map yeetube-settings-map)) \
 	    (when (boundp sym) (makunbound sym))))" > /dev/null
 	@for f in $(SRCS); do \
-	  emacsclient --eval "(load-file \"$(CURDIR)/$$f\")" > /dev/null || \
-	    printf "\033[31mFAIL\033[0m $$f\n"; \
+	  $(EMACSCLIENT) --eval "(load-file \"$(CURDIR)/$$f\")" > /dev/null || \
+	    { printf "\033[31mFAIL\033[0m $$f\n" >&2; exit 1; }; \
 	done
-	@emacsclient --eval "(dolist (buf (buffer-list)) \
+	@$(EMACSCLIENT) --eval "(dolist (buf (buffer-list)) \
 	  (with-current-buffer buf \
 	    (when (derived-mode-p 'yeetube-mode) \
 	      (use-local-map yeetube-mode-map))))" > /dev/null

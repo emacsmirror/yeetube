@@ -21,14 +21,27 @@
 
 ;;; Group 1: yeetube--page-callback error detection (regression)
 
-(ert-deftest yeetube-test-callback-plist-get-arg-order ()
-  "Verify plist-get extracts :error from a status plist correctly."
-  ;; This is the core of the bug: (plist-get :error status) always returned nil.
-  (let ((status '(:error (error http 404))))
-    (should (equal '(error http 404) (plist-get status :error))))
-  ;; No error case
-  (let ((status '(:peer (:certificate ...))))
-    (should-not (plist-get status :error))))
+(ert-deftest yeetube-test-callback-rejects-http-error-before-parsing ()
+  "A real search callback rejects HTTP errors without parsing or rendering."
+  (let ((yeetube--buffer-name " *yeetube-error-test*") callback parsed)
+    (save-window-excursion
+      (unwind-protect
+          (cl-letf (((symbol-function 'yeetube--fetch)
+                     (lambda (_request function &optional _args)
+                       (setq callback function)))
+                    ((symbol-function 'yeetube-backend-parse-page)
+                     (lambda (&rest _) (setq parsed t))))
+            (yeetube-search "test")
+            (let ((response (generate-new-buffer " *failed-response*")))
+              (with-current-buffer response
+                (funcall callback '(:error (error http 404))))
+              (should-not (buffer-live-p response)))
+            (should-not parsed)
+            (should-not yeetube-items)
+            (should (string-match-p "Could not retrieve backend response"
+                                    (buffer-string))))
+        (when-let* ((buffer (get-buffer yeetube--buffer-name)))
+          (kill-buffer buffer))))))
 
 ;;; Group 2: yeetube--find-item
 
@@ -71,6 +84,7 @@
                (start-process "yeetube-test-dummy" nil "true")))
             ((symbol-function 'get-process) (lambda (_n) nil)))
     (let* ((yeetube-mpv-program "mpv")
+           (yeetube-ytdlp-program "yt-dlp")
            (yeetube-mpv-enable-torsocks nil)
            (yeetube-mpv-video-quality "720")
            (yeetube-mpv-additional-flags nil)
@@ -337,7 +351,7 @@ Return a cons of the resulting display text and captured message."
   "Legacy continuation data reuses the current request URL."
   (should
    (equal '(:token "next" :url "/youtubei/v1/browse")
-          (yeetube--continuation-inherit-url
+          (yeetube-backend-next-continuation 'youtube
            '(:token "next" :url "")
            '(:token "old" :url "/youtubei/v1/browse")))))
 
@@ -350,64 +364,8 @@ Return a cons of the resulting display text and captured message."
       (should-error (yeetube-replay) :type 'user-error)
       (should-not played))))
 
-(ert-deftest yeetube-test-download-requires-torsocks-when-tor-enabled ()
-  "Tor-enabled downloads fail closed without torsocks."
-  (dolist (program '(nil ""))
-    (let ((yeetube-ytdlp-program "yt-dlp")
-          (yeetube-enable-tor t)
-          (yeetube-torsocks-program program)
-          called)
-      (cl-letf (((symbol-function 'call-process-shell-command)
-                 (lambda (&rest _) (setq called t))))
-        (should-error (yeetube-download--ytdlp "https://example.com/video")
-                      :type 'user-error)
-        (should-not called)))))
-
-(ert-deftest yeetube-test-download-uses-configured-torsocks ()
-  "Tor-enabled downloads invoke configured torsocks."
-  (let ((yeetube-ytdlp-program "yt-dlp")
-        (yeetube-enable-tor t)
-        (yeetube-torsocks-program "torsocks")
-        command)
-    (cl-letf (((symbol-function 'call-process-shell-command)
-               (lambda (value &rest _) (setq command value))))
-      (yeetube-download--ytdlp "https://example.com/video")
-      (should (string-prefix-p "torsocks yt-dlp " command)))))
-
-(ert-deftest yeetube-test-download-omits-blank-output-name ()
-  "Blank output names omit -o; non-empty names stay shell-quoted."
-  (let ((yeetube-ytdlp-program "yt-dlp")
-        (yeetube-enable-tor nil)
-        commands)
-    (cl-letf (((symbol-function 'call-process-shell-command)
-               (lambda (value &rest _)
-                 (push value commands)
-                 0)))
-      (yeetube-download--ytdlp "https://example.com/video" nil)
-      (yeetube-download--ytdlp "https://example.com/video" "")
-      (yeetube-download--ytdlp "https://example.com/video" "my file.mp4")
-      (setf commands (nreverse commands))
-      (should-not (string-match-p " -o " (nth 0 commands)))
-      (should-not (string-match-p " -o " (nth 1 commands)))
-      (should (string-match-p
-               (concat " -o " (regexp-quote
-                               (shell-quote-argument "my file.mp4")))
-               (nth 2 commands))))))
-
-(ert-deftest yeetube-test-download-quotes-program-and-torsocks ()
-  "Spaced yt-dlp and torsocks paths remain single shell tokens."
-  (let ((yeetube-ytdlp-program "/opt/my yt-dlp/bin/yt-dlp")
-        (yeetube-enable-tor t)
-        (yeetube-torsocks-program "/opt/my torsocks/bin/torsocks")
-        command)
-    (cl-letf (((symbol-function 'call-process-shell-command)
-               (lambda (value &rest _) (setq command value) 0)))
-      (yeetube-download--ytdlp "https://example.com/video")
-      (should (string-prefix-p
-               (concat (shell-quote-argument yeetube-torsocks-program) " "
-                       (shell-quote-argument yeetube-ytdlp-program) " ")
-               command))
-      (should-not (string-match-p "^/opt/my torsocks/" command)))))
+;; Downloader argv and failure paths are exercised with real local processes
+;; in yeetube-download-tests.el.
 
 (defun yeetube-test--with-tabulated-entry (id body)
   "Call BODY in a temp tabulated-list buffer with entry ID or none."

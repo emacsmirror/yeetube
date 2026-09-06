@@ -95,12 +95,20 @@ INPUT can be a URL or a local file path.
 INFO is optional information to display with `yeetube-mpv-modeline-mode'.
 
 This function is not specific to just playing URLs.  Feel free to use
-it to play local files."
+it to play local files.
+The downloader path must not contain mpv's hook separator: semicolon
+on Windows, colon elsewhere.  Use a separator-free symlink if needed."
   (when (and yeetube-mpv-enable-torsocks
              (or (null yeetube-torsocks-program)
                  (string= yeetube-torsocks-program "")))
     (user-error "Torsocks program not found; install torsocks or disable torsocks"))
   (yeetube-mpv-check)
+  ;; ytdl_hook splits paths after mp.options, regardless of shell quoting.
+  (let ((separator (if (eq system-type 'windows-nt) ";" ":")))
+    (when (string-match-p separator yeetube-ytdlp-program)
+      (user-error
+       "Mpv splits downloader paths on %s; set yeetube-ytdlp-program to a path or symlink without %s"
+       separator separator)))
   (let* ((base-flags (remove "--no-video" yeetube-mpv-additional-flags))
          (flags (append (when yeetube-mpv-no-video '("--no-video"))
                         base-flags))
@@ -112,9 +120,15 @@ it to play local files."
                   " --ytdl-format="
                   (yeetube-mpv-ytdl-format-video-quality yeetube-mpv-video-quality)
                   " "
-                  (shell-quote-argument input)
+                  ;; -append leaves the value literal, including commas.
+                  ;; Shell quoting alone does not escape mpv's option grammar.
+                  (shell-quote-argument
+                   (concat "--script-opts-append=ytdl_hook-ytdl_path="
+                           yeetube-ytdlp-program))
                   (when flags
-                    (concat " " (mapconcat #'shell-quote-argument flags " ")))))
+                    (concat " " (mapconcat #'shell-quote-argument flags " ")))
+                  " -- "
+                  (shell-quote-argument input)))
          (proc (yeetube-mpv-process command)))
     (message "Yeetube command: %s" command)
     (message (if yeetube-mpv-enable-torsocks

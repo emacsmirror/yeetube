@@ -28,8 +28,10 @@ Core features include:
 - Org-link integration for videos & playlists
 - A standalone, minimalist yt-dlp wrapper
 
-/This package does not use Invidious or YouTube's API, just parses
-html & json./
+Search and channel results come directly from YouTube HTML and JSON,
+without an API key.  =yeetube-browse-url= opens the selected item in a
+browser through an instance from =yeetube-youtube-invidious-instances=;
+it does not use Invidious for searches.
 
 ** Installation
 :PROPERTIES:
@@ -136,19 +138,30 @@ are fetched automatically.
 :PROPERTIES:
 :CUSTOM_ID: tor-torsocks-support
 :END:
-For enhanced privacy, using tor & torsocks:
+Tor routing for Emacs HTTP(S) retrieval is currently unsupported.
+With =yeetube-enable-tor= non-nil, YeeTube rejects searches, page/feed
+fetches and thumbnail requests before entering Emacs URL networking.
+HTTPS selects its own TLS transport and existing connections can bypass
+SOCKS gateway selection; setting a SOCKS gateway alone is not safe.
+Plain HTTP is also rejected because it can redirect to HTTPS.  No request
+is silently retried through native networking.
+
+To intentionally use native Emacs URL networking (without a YeeTube Tor
+guarantee), leave the default or explicitly set:
 
 #+begin_src emacs-lisp
-(setf yeetube-enable-tor t)
+(setq yeetube-enable-tor nil)
 #+end_src
 
-You can also toggle torsocks for mpv per-buffer from the settings
-submenu (=o= then =t=).
+The policy is checked at submission: rejected Tor thumbnails are never
+queued, and already accepted native jobs are not rerouted by later option
+changes.  Unrelated Emacs networking is unaffected.
 
-It's recommended to disable thumbnail support to improve performance
-when using tor.
-
-Yeetube is configured to use tor via port 9050.
+For external downloads, =yeetube-enable-tor= still selects the =torsocks=
+wrapper.  The separate mpv torsocks toggle is available per-buffer in the
+settings submenu (=o= then =t=).  Neither wrapper enables Tor support for
+Emacs URL retrieval; configure Tor/torsocks separately for those external
+tools.
 
 *** Org links
 :PROPERTIES:
@@ -170,5 +183,14 @@ playlist), and export it as a regular YouTube URL.  To activate:
 The repository ships a Nix flake providing Emacs with all
 dependencies.  =make compile=, =make test= and =make lint= re-enter
 themselves through =nix develop= when =nix= is available; =make dev=
-runs all three.  =nix flake check= runs the test suite as a Nix
-check.
+runs all three.  Byte-compilation warnings and checkdoc diagnostics fail
+the build.  =nix flake check --no-write-lock-file= runs the same compile,
+lint and ERT gates in an isolated Nix build, using pinned dependencies.
+Source, test and fixture files are listed in the Makefile's =SRCS=,
+=TESTS= and =FIXTURES= manifests; add new files there so Nix includes them.
+
+=make load= removes local bytecode and reloads source modules in dependency
+order through =emacsclient=.  It stops on the first failure and only reports
+success after all modules load and buffer keymaps are refreshed.  This
+changes the running Emacs session; it is not a test gate or an atomic reload,
+and a failure can leave earlier modules loaded.

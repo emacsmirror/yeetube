@@ -35,7 +35,7 @@
 ;; Forward declarations -- functions from yeetube.el
 (declare-function yeetube--queue-retrieve "yeetube" (url callback cbargs))
 
-(defvar yeetube-content nil
+(defvar-local yeetube-content nil
   "Tabulated-list rows (ID VECTOR) pairs.")
 
 
@@ -238,10 +238,14 @@ Unparseable relative units return 0."
                     ("Channel"  ,(/ w 8) t)]))
     columns))
 
+(defvar-local yeetube-ui--render-owner nil
+  "Identity of the current complete results rendering.")
+
 (defun yeetube-ui-render (items)
   "Convert ITEMS (list of plists) to tabulated-list rows and display."
   (let ((rows (mapcar #'yeetube-ui--entry-to-row items)))
-    (setf yeetube-content rows
+    (setf yeetube-ui--render-owner (list 'render)
+          yeetube-content rows
           tabulated-list-format (yeetube-ui--tabulated-list-format)
           tabulated-list-entries yeetube-content
           tabulated-list-sort-key
@@ -249,11 +253,13 @@ Unparseable relative units return 0."
             (cons yeetube-default-sort-column
                   (not yeetube-default-sort-ascending))))
     (tabulated-list-init-header)
-    (tabulated-list-print)))
+    (tabulated-list-print t)))
 
 (defun yeetube-ui-append (items)
   "Append ITEMS to the current yeetube buffer."
-  (let ((new-rows (mapcar #'yeetube-ui--entry-to-row items)))
+  (let* ((yeetube-display-thumbnails-p
+          (equal (car (aref tabulated-list-format 0)) "Thumbnail"))
+         (new-rows (mapcar #'yeetube-ui--entry-to-row items)))
     (setf yeetube-content (append yeetube-content new-rows)
           tabulated-list-entries yeetube-content)
     (tabulated-list-print t)))
@@ -266,44 +272,64 @@ Unparseable relative units return 0."
 Return the image sized per `yeetube-thumbnail-size', or nil on error.
 STATUS is the URL retrieval callback status plist."
   (unless (plist-get status :error)
-    (when-let* ((handle (mm-dissect-buffer t))
-                (image (mm-get-image handle)))
-      (setf (image-property image :max-width) (car yeetube-thumbnail-size)
-            (image-property image :max-height) (cdr yeetube-thumbnail-size))
-      image)))
+    (when-let* ((handle (mm-dissect-buffer t)))
+      (unwind-protect
+          (when-let* ((image (mm-get-image handle)))
+            (setf (image-property image :max-width) (car yeetube-thumbnail-size)
+                  (image-property image :max-height) (cdr yeetube-thumbnail-size))
+            image)
+        (mm-destroy-parts handle)))))
 
-(defun yeetube-ui--image-callback (status entry-id buffer)
-  "Handle thumbnail image retrieval for ENTRY-ID.
-STATUS is the URL retrieval callback status plist.
-BUFFER is the yeetube display buffer name to update."
-  (let* ((url-buffer (current-buffer))
-         (image (yeetube-ui--extract-image status)))
-    (kill-buffer url-buffer)
-    (when image
-      ;; Update the vector in yeetube-content
-      (when-let* ((vec (cadr (assoc entry-id yeetube-content))))
-        (aset vec 0 (propertize (aref vec 0) 'display image)))
-      ;; Update the buffer text
-      (when (get-buffer buffer)
-        (with-current-buffer buffer
-          (with-silent-modifications
-            (save-excursion
-              (goto-char (point-min))
-              (when (search-forward (format "[[%s.jpg]]" entry-id) nil t)
-                (add-text-properties (match-beginning 0) (match-end 0)
-                                     `(display ,image))))))))))
+(defun yeetube-ui--image-owned-p (buffer owner layout row)
+  "Return non-nil if BUFFER still owns OWNER, LAYOUT and ROW."
+  (and (buffer-live-p buffer)
+       (with-current-buffer buffer
+         (and (derived-mode-p 'yeetube-mode)
+              owner (eq owner yeetube-ui--render-owner)
+              (eq layout tabulated-list-format)
+              (equal (car (aref layout 0)) "Thumbnail")
+              (memq row yeetube-content)))))
+
+(defun yeetube-ui--image-callback (status buffer owner layout row)
+  "Handle STATUS for BUFFER's thumbnail with OWNER, LAYOUT and ROW.
+Discard results when any captured display identity has changed."
+  (let ((url-buffer (current-buffer)))
+    (unwind-protect
+        (when (yeetube-ui--image-owned-p buffer owner layout row)
+          (when-let* ((image (yeetube-ui--extract-image status)))
+            (when (yeetube-ui--image-owned-p buffer owner layout row)
+              (with-current-buffer buffer
+                (let ((vec (cadr row)))
+                  (aset vec 0 (propertize (aref vec 0) 'display image)))
+                (with-silent-modifications
+                  (save-excursion
+                    (goto-char (point-min))
+                    (while (not (eobp))
+                      (when (equal (tabulated-list-get-id) (car row))
+                        (let ((end (line-end-position)))
+                          (when (search-forward
+                                 (format "[[%s.jpg]]" (car row)) end t)
+                            (add-text-properties (match-beginning 0) (match-end 0)
+                                                 `(display ,image)))))
+                      (forward-line 1))))))))
+      (when (buffer-live-p url-buffer) (kill-buffer url-buffer)))))
 
 (defun yeetube-ui-fetch-thumbnails (items buffer)
   "Fetch thumbnails for ITEMS and display them in BUFFER.
 Each element in ITEMS is a plist with at least :id and :thumbnail-url."
-  (when yeetube-display-thumbnails-p
-    (let ((url-request-extra-headers yeetube-request-headers))
-      (dolist (item items)
-        (let ((url (plist-get item :thumbnail-url))
-              (id (plist-get item :id)))
-          (when (and url (not (string-empty-p url)))
-            (yeetube--queue-retrieve url #'yeetube-ui--image-callback
-                                     (list id buffer))))))))
+  (when-let* ((buffer (get-buffer buffer)))
+    (with-current-buffer buffer
+      (when (and yeetube-ui--render-owner
+                 (equal (car (aref tabulated-list-format 0)) "Thumbnail"))
+        (let ((url-request-extra-headers yeetube-request-headers))
+          (dolist (item items)
+            (let ((url (plist-get item :thumbnail-url))
+                  (row (assoc (plist-get item :id) yeetube-content)))
+              (when (and row url (not (string-empty-p url)))
+                (yeetube--queue-retrieve
+                 url #'yeetube-ui--image-callback
+                 (list buffer yeetube-ui--render-owner
+                       tabulated-list-format row))))))))))
 
 (provide 'yeetube-ui)
 ;;; yeetube-ui.el ends here

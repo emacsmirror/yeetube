@@ -39,8 +39,8 @@
 
 (require 'compat)
 (require 'url)
+(require 'url-queue)
 (require 'cl-lib)
-(require 'socks)
 (require 'url-handlers)
 (require 'xdg)
 (require 'subr-x)
@@ -103,7 +103,11 @@
   :type 'boolean)
 
 (defcustom yeetube-enable-tor nil
-  "Enable routing through tor."
+  "Require Tor for YeeTube requests and wrap downloads with torsocks.
+Emacs URL retrieval cannot safely guarantee per-request Tor routing.
+When non-nil, reject fetches and thumbnails before transport starts.
+Set this to nil to intentionally use native Emacs URL networking.
+The separate mpv torsocks setting is unaffected."
   :type 'boolean)
 
 (defcustom yeetube-enable-emojis (and (char-displayable-p ?\N{GRINNING FACE}) t)
@@ -125,7 +129,7 @@
 (defconst yeetube--buffer-name "*yeetube*"
   "Name of the buffer displaying search results.")
 
-(defvar yeetube-items nil
+(defvar-local yeetube-items nil
   "List of scraped item plists.")
 
 (defvar-local yeetube--continuation nil
@@ -185,30 +189,37 @@ redirect via `ucbcb=1', plus the broader `gdpr=1' /
            :key (lambda (item) (plist-get item :id))
            :test #'equal))
 
+(defun yeetube--check-transport ()
+  "Reject unsupported Tor retrieval before entering Emacs URL networking."
+  ;; HTTPS explicitly selects TLS instead of `url-gateway-method', and
+  ;; pooled connections can bypass gateway selection entirely.  Reject all
+  ;; schemes: even plain HTTP can redirect to HTTPS.  Never silently fall
+  ;; back to native networking when the caller requested Tor.
+  (when yeetube-enable-tor
+    (user-error "Tor HTTP(S) retrieval is unsupported; set yeetube-enable-tor to nil to intentionally use native Emacs networking")))
+
 (defmacro yeetube-with-tor-socks (&rest body)
-  "Execute BODY, routed through tor when `yeetube-enable-tor' is non-nil."
-  `(let ((url-gateway-method (if yeetube-enable-tor 'socks url-gateway-method))
-         (socks-noproxy (if yeetube-enable-tor '("localhost") socks-noproxy))
-         (socks-server (if yeetube-enable-tor
-                           '("Default server" "127.0.0.1" 9050 5)
-                         socks-server)))
+  "Execute BODY only when `yeetube-enable-tor' is nil.
+Signal `user-error' otherwise: per-request Tor retrieval is unsupported."
+  (declare (indent 0) (debug t))
+  `(progn
+     (yeetube--check-transport)
      ,@body))
 
-;; Function wrapper for use from other modules: the macro above is not
-;; available when they are byte-compiled, a call here resolves at runtime.
 (defun yeetube--queue-retrieve (url callback cbargs)
-  "Queue retrieval of URL, calling CALLBACK with CBARGS.
-Routed through tor when `yeetube-enable-tor' is non-nil."
-  (yeetube-with-tor-socks
-   (url-queue-retrieve url callback cbargs 'silent 'inhibit-cookies)))
+  "Queue native retrieval of URL, calling CALLBACK with CBARGS.
+Reject Tor requests at submission, before creating a queue job.
+Subsequent changes to `yeetube-enable-tor' do not reroute accepted jobs."
+  (yeetube--check-transport)
+  (url-queue-retrieve url callback cbargs 'silent 'inhibit-cookies))
 
 (defun yeetube--fetch (request callback &optional cbargs)
   "Retrieve REQUEST asynchronously, then call CALLBACK with CBARGS.
 REQUEST is a plist (:url U :method M :headers H :data D) as returned
 by the `yeetube-backend-*-request' generics; only :url is required.
 Request headers are appended after `yeetube-request-headers', so
-they can add headers but not override the defaults.  Routed
-through tor when `yeetube-enable-tor' is non-nil."
+they can add headers but not override the defaults.  Reject requests
+when `yeetube-enable-tor' is non-nil, before entering URL networking."
   (let ((url-request-method (or (plist-get request :method) "GET"))
         (url-request-extra-headers (append yeetube-request-headers
                                            (plist-get request :headers)))
@@ -256,6 +267,13 @@ feed view (see `yeetube-display-feed')."
 
 ;;; Playback
 
+(defun yeetube--play-url (url title)
+  "Play URL using `yeetube-play-function', with TITLE for mpv's modeline."
+  (if (and (eq yeetube-play-function #'yeetube-mpv-play)
+           yeetube-mpv-modeline-mode)
+      (yeetube-mpv-play url title)
+    (funcall yeetube-play-function url)))
+
 ;;;###autoload
 (defun yeetube-play ()
   "Play video at point in *yeetube* buffer."
@@ -264,8 +282,7 @@ feed view (see `yeetube-display-feed')."
          (item (yeetube--find-item id))
          (url (yeetube-get-url id (plist-get item :type)))
          (title (plist-get item :title))
-         (proc (apply yeetube-play-function url
-                      (and yeetube-mpv-modeline-mode (list title)))))
+         (proc (yeetube--play-url url title)))
     (when (processp proc)
       (process-put proc :now-playing title))
     (push (list :url url :title title) yeetube-history)
@@ -308,7 +325,7 @@ Select entry title from `yeetube-history' and play corresponding URL."
 	 (title (or (plist-get selected-entry :title)
                     (user-error "Unknown replay entry: %s" selected)))
          (url (plist-get selected-entry :url)))
-    (funcall yeetube-play-function url (and yeetube-mpv-modeline-mode title))
+    (yeetube--play-url url title)
     (message "Replaying: %s" selected)))
 
 ;;;###autoload
@@ -347,11 +364,11 @@ If the bookmark file is empty or unreadable, reset
 (defun yeetube-save-video (arg)
   "Save url at point.
 
-If ARG is non-nil, save as a playlist URL."
+Use the entry type at point.  If ARG is non-nil, save as a playlist URL."
   (interactive "P")
   (yeetube-load-saved-videos)
   (let ((name (read-string "Save as: "))
-	(url (yeetube-get-url (tabulated-list-get-id) (if arg 'playlist 'video))))
+	(url (yeetube-get-url (tabulated-list-get-id) (and arg 'playlist))))
     (push (cons name url) yeetube-saved-videos)
     (yeetube-save-saved-videos)))
 
@@ -366,7 +383,7 @@ If ARG is non-nil, save as a playlist URL."
          (entry (assoc video yeetube-saved-videos))
          (title (car entry))
          (url (cdr entry)))
-    (funcall yeetube-play-function url (and yeetube-mpv-modeline-mode title))
+    (yeetube--play-url url title)
     (message "Playing: %s" title)))
 
 ;;;###autoload
@@ -411,12 +428,89 @@ Optionally, provide custom own URL."
     (when (string-prefix-p "http" url)
       (let ((default-directory (or yeetube--download-directory
                                    yeetube-download-directory)))
-        (yeetube-download--ytdlp url nil (or yeetube--audio-format
-                                             yeetube-download-audio-format))
+        (yeetube-download--ytdlp
+         url nil (if (local-variable-p 'yeetube--audio-format)
+                     yeetube--audio-format
+                   yeetube-download-audio-format))
         (message "Downloading: '%s' at '%s'" title default-directory)))))
 
 
 ;;; Search & Callbacks
+
+(defvar-local yeetube--request-owner nil
+  "Identity of the current results request lifecycle.")
+
+(defvar-local yeetube--page-pending nil
+  "Non-nil while a continuation request is outstanding.")
+
+(defvar-local yeetube--results-backend nil
+  "Backend owning the displayed items and continuation.")
+
+(defvar yeetube--response-owner nil
+  "Dynamically bound buffer and request identity during a response.")
+
+(defun yeetube--response-owned-p ()
+  "Return non-nil if the current response still owns its target."
+  (or (null yeetube--response-owner)
+      (let ((buffer (car yeetube--response-owner)))
+        (and (buffer-live-p buffer)
+             (with-current-buffer buffer
+               (and (derived-mode-p 'yeetube-mode)
+                    (eq (cdr yeetube--response-owner)
+                        yeetube--request-owner)))))))
+
+(defun yeetube--request (request callback &optional cbargs append-page)
+  "Fetch REQUEST and call CALLBACK with owned results and CBARGS.
+APPEND-PAGE retains the current lifecycle; other requests replace it.
+Capture the exact display buffer and backend before asynchronous work."
+  (let* ((buffer (get-buffer-create yeetube--buffer-name))
+         (backend (if append-page
+                      (buffer-local-value 'yeetube--results-backend buffer)
+                    yeetube-backend))
+         (owner (with-current-buffer buffer
+                  (unless (derived-mode-p 'yeetube-mode) (yeetube-mode))
+                  (if append-page
+                      yeetube--request-owner
+                    (setq yeetube--continuation nil
+                          yeetube--page-pending nil
+                          yeetube-ui--render-owner nil
+                          yeetube--results-backend backend
+                          yeetube--request-owner (list 'request)))))
+         (pending (list 'pending))
+         (settled nil)
+         (dispatched nil))
+    (when append-page
+      (with-current-buffer buffer (setq yeetube--page-pending pending)))
+    (unwind-protect
+        (prog1
+            (yeetube--fetch
+             request
+             (lambda (status)
+               (let ((response (current-buffer)))
+                 (unwind-protect
+                     (when (and (not settled) (buffer-live-p buffer)
+                                (with-current-buffer buffer
+                                  (and (derived-mode-p 'yeetube-mode)
+                                       (eq owner yeetube--request-owner)
+                                       (or (not append-page)
+                                           (eq pending yeetube--page-pending)))))
+                       (setq settled t)
+                       (let ((yeetube--buffer-name buffer)
+                             (yeetube-backend backend)
+                             (yeetube--response-owner (cons buffer owner)))
+                         (apply callback status cbargs)))
+                   (when (buffer-live-p buffer)
+                     (with-current-buffer buffer
+                       (when (eq pending yeetube--page-pending)
+                         (setq yeetube--page-pending nil))))
+                   (when (buffer-live-p response) (kill-buffer response)))))
+             nil)
+          (setq dispatched t))
+      ;; A synchronous dispatch error must leave pagination retryable.
+      (when (and (not dispatched) (buffer-live-p buffer))
+        (with-current-buffer buffer
+          (when (eq pending yeetube--page-pending)
+            (setq yeetube--page-pending nil)))))))
 
 (defun yeetube--render-items (items limit &optional continuation channel-identity)
   "Render ITEMS into the *yeetube* buffer with LIMIT and CONTINUATION.
@@ -430,29 +524,22 @@ major mode, populates state, and kicks off thumbnail fetching."
     (funcall pop-fn yeetube--buffer-name)
     ;; Enabling the mode kills buffer-locals, so re-renders must not
     ;; reset settings like video quality or download directory.
-    (unless (derived-mode-p 'yeetube-mode)
-      (yeetube-mode))
-    (setq yeetube-items items)
-    (setq-local yeetube--continuation continuation)
-    (setq-local yeetube--results-limit limit)
-    (setq-local yeetube--channel-context channel-identity)
-    (yeetube-ui-render items)
-    (yeetube-ui-fetch-thumbnails items yeetube--buffer-name)))
+    (when (yeetube--response-owned-p)
+      (unless (derived-mode-p 'yeetube-mode)
+        (yeetube-mode))
+      (setq yeetube-items items)
+      (setq-local yeetube--continuation continuation)
+      (setq-local yeetube--results-limit limit)
+      (setq-local yeetube--channel-context channel-identity)
+      (yeetube-ui-render items)
+      (when (yeetube--response-owned-p)
+        (yeetube-ui-fetch-thumbnails items yeetube--buffer-name)))))
 
 (defun yeetube--current-limit ()
   "Return the active results limit, reading from the *yeetube* buffer."
   (let ((buf (get-buffer yeetube--buffer-name)))
     (or (and buf (buffer-local-value 'yeetube--results-limit buf))
         yeetube-results-limit)))
-
-(defun yeetube--current-channel-context ()
-  "Return buffer-local channel identity for the *yeetube* buffer, or nil."
-  (when-let* ((buf (get-buffer yeetube--buffer-name)))
-    (buffer-local-value 'yeetube--channel-context buf)))
-
-(defun yeetube--apply-channel-context (items)
-  "Fill empty channel fields on ITEMS from the active channel context."
-  (yeetube-scraper-fill-channel-identity items (yeetube--current-channel-context)))
 
 (defun yeetube--decode-url-buffer (url-buffer)
   "Insert URL-BUFFER's body into the current buffer, decoded as UTF-8.
@@ -478,15 +565,17 @@ scoped to a throwaway buffer for parsing."
   "Report response failure MESSAGE to the user.
 Clear an active loading indicator without erasing existing results.
 DETAIL is an optional diagnostic string."
-  (when-let* ((buffer (get-buffer yeetube--buffer-name)))
+  (when-let* ((buffer (and (yeetube--response-owned-p)
+                           (get-buffer yeetube--buffer-name))))
     (with-current-buffer buffer
       (when (string-match-p "\\`Loading" (buffer-string))
         (let ((inhibit-read-only t))
           (erase-buffer)
           (insert message)))))
-  (if detail
-      (message "%s: %s" message detail)
-    (message "%s" message)))
+  (when (yeetube--response-owned-p)
+    (if detail
+        (message "%s: %s" message detail)
+      (message "%s" message))))
 
 (defun yeetube--show-parse-error (&optional detail)
   "Report a backend parse failure with optional DETAIL."
@@ -508,7 +597,8 @@ the decoded response body."
           (condition-case err
               (with-temp-buffer
                 (yeetube--decode-url-buffer url-buffer)
-                (funcall parser))
+                (let ((result (funcall parser)))
+                  (and (yeetube--response-owned-p) result)))
             (error
              (yeetube--show-parse-error (error-message-string err))
              nil)))
@@ -521,7 +611,8 @@ the decoded response body."
                   status
                   (lambda () (yeetube-backend-parse-page yeetube-backend))))
          (items (plist-get result :items)))
-    (cond (items
+    (cond ((not (yeetube--response-owned-p)) nil)
+          (items
            (yeetube--render-items items limit
                                   (plist-get result :continuation)
                                   (plist-get result :channel-identity))
@@ -537,7 +628,8 @@ with the regular page parser."
                  (yeetube--parse-response
                   status
                   (lambda () (yeetube-backend-parse-feed yeetube-backend))))))
-    (cond (items (yeetube--render-items items (yeetube--current-limit)))
+    (cond ((not (yeetube--response-owned-p)) nil)
+          (items (yeetube--render-items items (yeetube--current-limit)))
           ((plist-get status :error)
            (when fallback-url (yeetube-display-content-from-url fallback-url)))
           (fallback-url
@@ -555,19 +647,19 @@ and to paginate past YouTube's 15-entry RSS cap."
   (let ((url (yeetube-backend-feed-url yeetube-backend channel)))
     (unless url
       (user-error "Backend `%s' does not provide feeds" yeetube-backend))
-    (yeetube--fetch (list :url url) #'yeetube--feed-callback
+    (yeetube--request (list :url url) #'yeetube--feed-callback
                     (and fallback-url (list fallback-url)))))
 
 (defun yeetube-display-content-from-url (url)
   "Display the video results from URL."
-  (yeetube--fetch (list :url url) #'yeetube--page-callback))
+  (yeetube--request (list :url url) #'yeetube--page-callback))
 
 ;;;###autoload
 (defun yeetube-search (query)
   "Search for QUERY."
   (interactive (list (yeetube-read-query)))
   (yeetube--display-loading)
-  (yeetube--fetch (yeetube-backend-search-request yeetube-backend query)
+  (yeetube--request (yeetube-backend-search-request yeetube-backend query)
                   #'yeetube--page-callback))
 
 
@@ -575,7 +667,8 @@ and to paginate past YouTube's 15-entry RSS cap."
 
 (defun yeetube--auto-paginate (limit)
   "Automatically fetch next page if current items are below LIMIT."
-  (when (and yeetube--continuation
+  (when (and (yeetube--response-owned-p)
+             yeetube--continuation
              (length< yeetube-items limit))
     (yeetube-next-page)))
 
@@ -585,38 +678,37 @@ and to paginate past YouTube's 15-entry RSS cap."
   (interactive)
   (unless yeetube--continuation
     (user-error "No more results"))
-  (yeetube--fetch
-   (yeetube-backend-continuation-request yeetube-backend yeetube--continuation)
-   #'yeetube--continuation-callback))
+  (unless yeetube--page-pending
+    (yeetube--request
+     (yeetube-backend-continuation-request
+      yeetube--results-backend yeetube--continuation)
+     #'yeetube--continuation-callback
+     (list yeetube--continuation yeetube--channel-context) t)))
 
-(defun yeetube--continuation-inherit-url (continuation previous)
-  "Return CONTINUATION with a missing URL inherited from PREVIOUS."
-  (let ((url (plist-get continuation :url))
-        (previous-url (plist-get previous :url)))
-    (if (and continuation
-             (or (null url) (string-empty-p url))
-             (stringp previous-url)
-             (not (string-empty-p previous-url)))
-        (plist-put (copy-sequence continuation) :url previous-url)
-      continuation)))
-
-(defun yeetube--continuation-callback (status)
-  "Append the parsed next page from a URL response with STATUS."
+(defun yeetube--continuation-callback (status &optional previous channel-identity)
+  "Append a next page with STATUS for PREVIOUS and CHANNEL-IDENTITY.
+PREVIOUS is the opaque token used for this request; CHANNEL-IDENTITY
+is its originating channel context."
   (let* ((result (yeetube--parse-response
                   status
                   (lambda () (yeetube-backend-parse-continuation yeetube-backend))))
-         (items (yeetube--apply-channel-context (plist-get result :items))))
+         (items (yeetube-scraper-fill-channel-identity
+                 (plist-get result :items) channel-identity))
+         (continuation (and result
+                            (yeetube-backend-next-continuation
+                             yeetube-backend (plist-get result :continuation)
+                             previous))))
     (cond
+     ((not (yeetube--response-owned-p)) nil)
      (items
       (with-current-buffer yeetube--buffer-name
-        (setq yeetube-items (append yeetube-items items))
-        (setq-local yeetube--continuation
-                    (yeetube--continuation-inherit-url
-                     (plist-get result :continuation)
-                     yeetube--continuation))
+        (setq yeetube-items (append yeetube-items items)
+              yeetube--page-pending nil
+              yeetube--continuation continuation)
         (yeetube-ui-append items)
-        (yeetube-ui-fetch-thumbnails items yeetube--buffer-name)
-        (yeetube--auto-paginate (yeetube--current-limit))))
+        (when (yeetube--response-owned-p)
+          (yeetube-ui-fetch-thumbnails items yeetube--buffer-name)
+          (yeetube--auto-paginate (yeetube--current-limit)))))
      (result
       (with-current-buffer yeetube--buffer-name
         (setq-local yeetube--continuation nil))
@@ -633,7 +725,7 @@ WHAT is `videos', `streams', or `search' with a QUERY string."
     (user-error "No channel ID available"))
   (let ((channel (string-trim channel)))
     (message "Fetching channel %s" channel)
-    (yeetube--fetch
+    (yeetube--request
      (yeetube-backend-channel-request yeetube-backend channel what query)
      #'yeetube--page-callback)))
 

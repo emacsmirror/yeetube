@@ -56,15 +56,55 @@ buffer is in `yeetube-mode' and the item at point matches TYPE."
                               :link (format "yt-%S:%s" type id)
                               :description title)))))
 
+(declare-function org-html-encode-plain-text "ox-html" (text))
+(declare-function org-md-plain-text "ox-md" (text info))
+(declare-function org-latex-plain-text "ox-latex" (text info))
+(declare-function org-latex--protect-text "ox-latex" (text))
+
+(defun yeetube-ol--encode-url (url regexp)
+  "Percent-encode characters matching REGEXP in URL.
+Leave existing escapes and URL separators intact."
+  (replace-regexp-in-string
+   regexp
+   (lambda (char)
+     (mapconcat (lambda (byte) (format "%%%02X" byte))
+                (encode-coding-string char 'utf-8 t) ""))
+   url t t))
+
+(defun yeetube-ol--html-text (text)
+  "Escape TEXT for HTML text or a double-quoted attribute."
+  ;; Org's plain-text encoder does not escape attribute delimiters.
+  (replace-regexp-in-string
+   "\"" "&quot;" (org-html-encode-plain-text text) t t))
+
 (defun yeetube-ol--export (url desc backend)
   "Export URL with description DESC to BACKEND.
-DESC falls back to URL when nil."
-  (let ((desc (or desc url)))
-    (pcase backend
-      ('html (format "<a href=\"%s\">%s</a>" url desc))
-      ('md (format "[%s](%s)" desc url))
-      ('latex (format "\\href{%s}{%s}" url desc))
-      (_ desc))))
+DESC is already exported by Org.  When nil, escape URL as plain text
+for the fallback label, separately from the link destination."
+  (pcase backend
+    ('html
+     (require 'ox-html)
+     (format "<a href=\"%s\">%s</a>"
+             (yeetube-ol--html-text url)
+             (or desc (yeetube-ol--html-text url))))
+    ('md
+     (require 'ox-md)
+     (format "[%s](%s)"
+             (or desc
+                 (replace-regexp-in-string
+                  "[][]" "\\\\\\&"
+                  (org-md-plain-text (org-html-encode-plain-text url) nil)))
+             (org-html-encode-plain-text
+              (yeetube-ol--encode-url url "[][()<>\"\\\\{}[:space:][:cntrl:]]"))))
+    ('latex
+     (require 'ox-latex)
+     ;; Encoding braces and backslashes avoids TeX command/group syntax;
+     ;; protect the remaining URL characters just as native Org links do.
+     (format "\\href{%s}{%s}"
+             (org-latex--protect-text
+              (yeetube-ol--encode-url url "[\\\\{}[:space:][:cntrl:]]"))
+             (or desc (org-latex-plain-text url nil))))
+    (_ (or desc url))))
 
 ;;; Store / follow / export
 

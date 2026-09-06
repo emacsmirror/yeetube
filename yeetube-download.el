@@ -35,33 +35,71 @@
 (defvar yeetube-download-directory)
 (defvar yeetube-download-audio-format)
 
-(defun yeetube-download--ytdlp (url &optional name audio-format)
-  "Download URL using yt-dlp.
+(defun yeetube-download--sentinel (process _event)
+  "Report the terminal status of download PROCESS once.
+Ignore the event text _EVENT; use the actual process status instead."
+  (when (and (memq (process-status process) '(exit signal failed))
+             (not (process-get process 'yeetube-download-reported)))
+    (process-put process 'yeetube-download-reported t)
+    (let* ((buffer (process-buffer process))
+           (status (pcase (process-status process)
+                     ('exit (if (zerop (process-exit-status process))
+                                "Download finished successfully"
+                              (format "Download failed (exit %d)"
+                                      (process-exit-status process))))
+                     ('signal (format "Download cancelled or terminated (signal %d)"
+                                      (process-exit-status process)))
+                     ('failed "Download failed to start"))))
+      (when (buffer-live-p buffer)
+        (with-current-buffer buffer
+          (let ((inhibit-read-only t))
+            (save-excursion
+              (save-restriction
+                (widen)
+                (goto-char (point-max))
+                (insert "\n" status "\n"))))))
+      (message "%s%s" status
+               (if (buffer-live-p buffer)
+                   (format "; see %s" (buffer-name buffer))
+                 "")))))
 
-Optional values:
- NAME for custom file name.
- AUDIO-FORMAT to extract and keep contents as specified audio-format only."
-  (unless yeetube-ytdlp-program
-    (error "Executable for yt-dlp not found.  Please set `yeetube-ytdlp-program'"))
-  (when (and yeetube-enable-tor
-             (or (null yeetube-torsocks-program)
-                 (string-empty-p yeetube-torsocks-program)))
-    (user-error "Executable for torsocks not found"))
-  (let* ((tor-command (when yeetube-enable-tor
-                        (shell-quote-argument yeetube-torsocks-program)))
-         (name-command (when (and name (not (string-empty-p name)))
-                         (format "-o %s" (shell-quote-argument name))))
-         (format-command (when audio-format
-			   (format "--extract-audio --audio-format %s"
-				   (shell-quote-argument audio-format))))
-         (command (string-join (delq nil
-                                     (list tor-command
-                                           (shell-quote-argument
-                                            yeetube-ytdlp-program)
-                                           (shell-quote-argument url)
-                                           name-command format-command))
-                               " ")))
-    (call-process-shell-command command nil 0)))
+(defun yeetube-download--executable (program label)
+  "Resolve executable PROGRAM or signal a user error naming LABEL."
+  (or (and (stringp program) (not (string-empty-p program))
+           (executable-find program))
+      (user-error "Executable for %s not found" label)))
+
+(defun yeetube-download--ytdlp (url &optional name audio-format)
+  "Start downloading URL using yt-dlp and return its process.
+Use optional NAME as the output filename, unless empty.  Non-nil
+AUDIO-FORMAT extracts audio in that format; nil leaves video intact.
+Download in `default-directory'.  Arguments are passed without a shell.
+Keep output and final status in a unique *yeetube-download* buffer.
+Kill that buffer (confirming process termination) or use `delete-process'
+to cancel.  Signal an error if the executable is missing or launch fails."
+  (let* ((torsocks (when yeetube-enable-tor
+                     (yeetube-download--executable yeetube-torsocks-program
+                                                   "torsocks")))
+         (program (yeetube-download--executable yeetube-ytdlp-program "yt-dlp"))
+         (command (append (when torsocks (list torsocks)) (list program)
+                          (when (and name (not (string-empty-p name)))
+                            (list "-o" name))
+                          (when audio-format
+                            (list "--extract-audio" "--audio-format" audio-format))
+                          (list "--" url)))
+         (buffer (generate-new-buffer "*yeetube-download*")))
+    (condition-case err
+        (progn
+          (with-current-buffer buffer (special-mode))
+          (let ((process (make-process :name "yeetube-download"
+                                       :buffer buffer :command command
+                                       :connection-type 'pipe
+                                       :sentinel #'yeetube-download--sentinel)))
+            (message "Download started; see %s" (buffer-name buffer))
+            process))
+      ((error quit)
+       (when (buffer-live-p buffer) (kill-buffer buffer))
+       (signal (car err) (cdr err))))))
 
 ;;;###autoload
 (defun yeetube-download-change-directory ()

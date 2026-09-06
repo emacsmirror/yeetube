@@ -278,73 +278,43 @@
 
 ;;; Group 6: Thumbnail image callback
 
+(defun yeetube-ui-test--thumbnail-result (&optional remove-row)
+  "Deliver a deferred thumbnail, optionally after REMOVE-ROW.
+Return the display properties of the row vector and placeholder text."
+  (let ((yeetube-display-thumbnails-p t)
+        (item '(:id "test-id" :title "Title" :views "100" :duration "1:00"
+                :date "1 day ago" :channel "Ch" :type video
+                :thumbnail-url "https://invalid/image"))
+        callback args)
+    (with-temp-buffer
+      (yeetube-mode)
+      (yeetube-ui-render (list item))
+      (cl-letf (((symbol-function 'yeetube--queue-retrieve)
+                 (lambda (_url function cbargs)
+                   (setq callback function args cbargs)))
+                ((symbol-function 'yeetube-ui--extract-image)
+                 (lambda (_) '(image :type png :data "fakedata"))))
+        (yeetube-ui-fetch-thumbnails (list item) (buffer-name))
+        (let ((row (car yeetube-content)))
+          (when remove-row (setq yeetube-content nil))
+          (with-temp-buffer (apply callback nil args))
+          (goto-char (point-min))
+          (search-forward "[[test-id.jpg]]")
+          (cons (get-text-property 0 'display (aref (cadr row) 0))
+                (get-text-property (match-beginning 0) 'display)))))))
+
 (ert-deftest yeetube-ui-test-image-callback-persists-image-on-vector ()
-  "yeetube-ui--image-callback stores the image display property on the content vector."
-  (let* ((fake-image (list 'image :type 'png :data "fakedata"))
-         (vec (vector "[[test-id.jpg]]" "Title" "100" "1:00" "1 day ago" "Ch"))
-         (yeetube-content (list (list "test-id" vec)))
-         (yeetube-thumbnail-size '(120 . 90)))
-    (let ((display-buf (generate-new-buffer " *yeetube-test*")))
-      (unwind-protect
-          (progn
-            (with-current-buffer display-buf
-              (insert "[[test-id.jpg]]"))
-            (cl-letf (((symbol-function 'mm-dissect-buffer) (lambda (&rest _) t))
-                      ((symbol-function 'mm-get-image) (lambda (_) fake-image))
-                      ((symbol-function 'image-property)
-                       (lambda (img prop) (plist-get (cdr img) prop)))
-                      ((symbol-function 'set-image-property)
-                       (lambda (img prop val) (plist-put (cdr img) prop val))))
-              (with-temp-buffer
-                (yeetube-ui--image-callback nil "test-id" display-buf)))
-            ;; The vector's thumbnail slot should now carry a display property
-            (should (get-text-property 0 'display (aref vec 0))))
-        (kill-buffer display-buf)))))
+  "Deferred thumbnails persist on the owned row vector."
+  (should (equal '(image :type png :data "fakedata")
+                 (car (yeetube-ui-test--thumbnail-result)))))
 
 (ert-deftest yeetube-ui-test-image-callback-displays-image-in-buffer ()
-  "yeetube-ui--image-callback places the image in the display buffer."
-  (let* ((fake-image (list 'image :type 'png :data "fakedata"))
-         (vec (vector "[[test-id.jpg]]" "Title" "100" "1:00" "1 day ago" "Ch"))
-         (yeetube-content (list (list "test-id" vec)))
-         (yeetube-thumbnail-size '(120 . 90))
-         (buf-name " *yeetube-display-test*"))
-    (let ((display-buf (generate-new-buffer buf-name)))
-      (unwind-protect
-          (progn
-            (with-current-buffer display-buf
-              (insert "[[test-id.jpg]]"))
-            (cl-letf (((symbol-function 'mm-dissect-buffer) (lambda (&rest _) t))
-                      ((symbol-function 'mm-get-image) (lambda (_) fake-image))
-                      ((symbol-function 'image-property)
-                       (lambda (img prop) (plist-get (cdr img) prop)))
-                      ((symbol-function 'set-image-property)
-                       (lambda (img prop val) (plist-put (cdr img) prop val))))
-              ;; Pass buffer as a STRING name, just like the real code does
-              (with-temp-buffer
-                (yeetube-ui--image-callback nil "test-id" buf-name)))
-            ;; The placeholder text in the buffer should now have a display property
-            (with-current-buffer display-buf
-              (should (get-text-property 1 'display (buffer-string)))))
-        (when (buffer-live-p display-buf)
-          (kill-buffer display-buf))))))
+  "Deferred thumbnails decorate the owned row's placeholder."
+  (should (equal '(image :type png :data "fakedata")
+                 (cdr (yeetube-ui-test--thumbnail-result)))))
 
 (ert-deftest yeetube-ui-test-image-callback-no-crash-on-missing-entry ()
-  "yeetube-ui--image-callback does not crash when entry is not in yeetube-content."
-  (let* ((fake-image (list 'image :type 'png :data "fakedata"))
-         (yeetube-content nil)
-         (yeetube-thumbnail-size '(120 . 90)))
-    (with-temp-buffer
-      (insert "[[nonexistent.jpg]]")
-      (let ((target-buf (current-buffer)))
-        (cl-letf (((symbol-function 'mm-dissect-buffer) (lambda (&rest _) t))
-                  ((symbol-function 'mm-get-image) (lambda (_) fake-image))
-                  ((symbol-function 'image-property)
-                   (lambda (img prop) (plist-get (cdr img) prop)))
-                  ((symbol-function 'set-image-property)
-                   (lambda (img prop val) (plist-put (cdr img) prop val))))
-          ;; Should not signal an error
-          (with-temp-buffer
-            (yeetube-ui--image-callback nil "nonexistent" target-buf)))))))
-
+  "Removing a queued thumbnail's row prevents vector and text mutation."
+  (should (equal '(nil) (yeetube-ui-test--thumbnail-result t))))
 (provide 'yeetube-ui-tests)
 ;;; yeetube-ui-tests.el ends here

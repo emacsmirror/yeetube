@@ -76,6 +76,11 @@ Return a plist (:items ITEMS :continuation CONTINUATION).")
 Return a list of item plists, nil when feeds are unsupported."
   nil)
 
+(cl-defgeneric yeetube-backend-next-continuation (_backend continuation _previous)
+  "Return CONTINUATION, optionally completed using _PREVIOUS for _BACKEND.
+The default preserves the opaque continuation unchanged."
+  continuation)
+
 ;;; URLs
 
 (cl-defgeneric yeetube-backend-item-url (backend id type)

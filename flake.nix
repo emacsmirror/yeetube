@@ -21,12 +21,16 @@
           emacs = pkgs.emacs;
           emacsPackages = pkgs.emacsPackagesFor emacs;
 
-          source = lib.cleanSourceWith {
-            src = ./.;
-            filter = path: type:
-              let name = baseNameOf path;
-              in !(lib.hasSuffix ".elc" name
-                   || lib.hasSuffix "~" name);
+          # Makefile owns the source/test manifest, including reload order.
+          manifest = name:
+            lib.splitString " " (builtins.head
+              (builtins.match ".*\n${name} = ([^\n]+)\n.*"
+                (builtins.readFile ./Makefile)));
+          source = lib.fileset.toSource {
+            root = ./.;
+            fileset = lib.fileset.unions ([ ./Makefile ] ++
+              map (name: ./. + "/${name}")
+                (manifest "SRCS" ++ manifest "TESTS" ++ manifest "FIXTURES"));
           };
 
           keymapPopupVersion = "0.4.1";
@@ -35,9 +39,10 @@
             pname = "keymap-popup";
             version = keymapPopupVersion;
             src = pkgs.fetchurl {
-              url = "https://elpa.gnu.org/packages/keymap-popup-${keymapPopupVersion}.tar";
-              hash = "sha256-O2t6v0b8xknkevzXu6uu+M/ZiqPhcN/g5MytxKF4DkU=";
+              url = "https://elpa.gnu.org/packages/keymap-popup-${keymapPopupVersion}.tar.lz";
+              hash = "sha256-3Xs51u3K6LT3xRqRn82FrGfoKg9oXBRZSojpFAMmjXA=";
             };
+            nativeBuildInputs = [ pkgs.lzip ];
             packageRequires = [ ];
           };
 
@@ -68,7 +73,7 @@
                 "$XDG_DATA_HOME" "$XDG_STATE_HOME"
               EMACS_CMD=emacs \
                 YEETUBE_ENV_WRAPPED=1 \
-                make test
+                make dev
               runHook postBuild
             '';
 
