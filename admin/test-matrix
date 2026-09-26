@@ -1,0 +1,230 @@
+#!/usr/bin/env python3
+"""Run the declared minimum, pinned Nix default, and Thanos Emacs fork."""
+
+import argparse
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+
+
+LABELS = {
+    "minimum": "Package-Requires minimum",
+    "default": "Pinned nixpkgs default Emacs",
+    "fork": "Thanos Emacs fork",
+}
+
+
+def minimum_version(source):
+    header = (source / "yeetube.el").read_text()
+    matches = re.findall(r'^;; Package-Requires:.*\(emacs "([0-9]+(?:\.[0-9]+)+)"\)',
+                         header, re.MULTILINE)
+    if len(matches) != 1:
+        raise ValueError("Expected one exact Emacs Package-Requires minimum")
+    return matches[0]
+
+
+def executable(command):
+    found = shutil.which(command)
+    if not found:
+        raise ValueError(f"Required executable unavailable: {command}")
+    return str(Path(found).resolve())
+
+
+def manifest(source, name):
+    matches = re.findall(r"^" + name + r" = (.+)$", (source / "Makefile").read_text(), re.MULTILINE)
+    if len(matches) != 1:
+        raise ValueError(f"Missing or ambiguous Make manifest: {name}")
+    files = matches[0].split()
+    if len(files) != len(set(files)):
+        raise ValueError(f"Duplicate manifest entries: {name}")
+    if name == "TESTS" and set(files) != {str(p.relative_to(source)) for p in (source / "test").glob("*-tests.el")}:
+        raise ValueError("TESTS must list every ordinary test suite")
+    return files
+
+
+def snapshot(source, destination):
+    """Copy only manifest inputs; reject symlinks and path escapes."""
+    files = ["Makefile"] + [item for name in ("SRCS", "TESTS", "FIXTURES", "MATRIX_FILES")
+                            for item in manifest(source, name)]
+    for name in files:
+        relative = Path(name)
+        if relative.is_absolute() or ".." in relative.parts:
+            raise ValueError(f"Invalid source manifest path: {name}")
+        origin = source / relative
+        if not origin.is_file() or origin.resolve() != source.resolve() / relative:
+            raise ValueError(f"Source input is missing or symlinked: {name}")
+        target = destination / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(origin, target)
+
+
+def validate_stats(stats):
+    """Reject early exits, empty selections, failures and incomplete runs."""
+    keys = ("total", "completed", "expected", "unexpected", "skipped")
+    if any(type(stats.get(key)) is not int or stats[key] < 0 for key in keys):
+        raise ValueError("Invalid ERT completion receipt")
+    if not (stats["total"] > 0 and stats["completed"] == stats["total"]
+            and stats["expected"] + stats["unexpected"] + stats["skipped"] == stats["total"]
+            and stats["unexpected"] == 0):
+        raise ValueError(f"Failed or incomplete ERT run: {stats}")
+
+
+def lane(source, root, name, emacs, expected):
+    """Run one clean build with its own sources, dependencies and state."""
+    root.mkdir(parents=True, exist_ok=False)
+    build = root / "source"
+    snapshot(source, build)
+    env = os.environ.copy()
+    # Never inherit another Make invocation's runtime, targets or bytecode paths.
+    for key in ("MAKEFLAGS", "MFLAGS", "MAKEOVERRIDES", "EMACSLOADPATH",
+                "EMACSNATIVELOADPATH", "EMACS_OPTS", "EMACS_CMD", "EMACSDATA",
+                "EMACSDOC", "EMACSPATH"):
+        env.pop(key, None)
+    for key, directory in (("HOME", "home"), ("TMPDIR", "tmp"),
+                           ("XDG_CONFIG_HOME", "config"), ("XDG_CACHE_HOME", "cache"),
+                           ("XDG_DATA_HOME", "data"), ("XDG_STATE_HOME", "state")):
+        env[key] = str(root / directory)
+        Path(env[key]).mkdir()
+    env["YEETUBE_ENV_WRAPPED"] = "1"
+    dependencies = root / "dependencies"
+    shutil.copytree(env["YEETUBE_MATRIX_DEPS"], dependencies)
+    # Nested tooling tests launch the same runtime: source-only deps apply there too.
+    env["EMACSLOADPATH"] = str(dependencies) + os.pathsep
+    env["YEETUBE_MATRIX_RECEIPT"] = str(root / "ert.json")
+    if any(char.isspace() for char in emacs):
+        raise ValueError("Matrix scratch and executable paths must not contain whitespace")
+    version = subprocess.check_output(
+        [emacs, "-Q", "--batch", "--eval", "(princ emacs-version)"],
+        env=env, text=True).strip()
+    print(f"=== {LABELS[name]}: GNU Emacs {version} ({emacs}) ===", flush=True)
+    if expected is not None and version != expected:
+        raise ValueError(f"{LABELS[name]}: expected {expected}, got {version}")
+    receipt = {"lane": name, "label": LABELS[name], "version": version,
+               "executable": emacs, "source": str(build),
+               "environment": {key: env[key] for key in env if key in (
+                   "HOME", "TMPDIR", "XDG_CONFIG_HOME", "XDG_CACHE_HOME",
+                   "XDG_DATA_HOME", "XDG_STATE_HOME")}}
+    (root / "runtime.json").write_text(json.dumps(receipt, indent=2) + "\n")
+    def make(target, *overrides):
+        status = subprocess.run(["make", "--no-print-directory", target,
+                                 f"EMACS_CMD={emacs}", *overrides],
+                                cwd=build, env=env, check=False).returncode
+        if status:
+            raise RuntimeError(f"{LABELS[name]} {target} failed (exit {status}); diagnostics: {root}")
+
+    make("compile")
+    for file in manifest(build, "SRCS"):
+        if not (build / (file + "c")).is_file():
+            raise ValueError(f"Missing fresh bytecode: {file}")
+    make("lint")
+    selected = env.get("MATRIX_TESTS", " ".join(manifest(build, "TESTS"))).split()
+    if not selected or len(selected) != len(set(selected)) or not set(selected) <= set(manifest(build, "TESTS")):
+        raise ValueError("Invalid matrix test selection")
+    suites = {}
+    # Preserve YeeTube's native one-process-per-file isolation.
+    for index, file in enumerate(selected):
+        path = root / f"ert-{index}.json"
+        env["YEETUBE_MATRIX_RECEIPT"] = str(path)
+        make("do-matrix-test", "TESTS=" + file)
+        stats = json.loads(path.read_text())
+        validate_stats(stats)
+        suites[file] = stats
+    (root / "ert.json").write_text(json.dumps(suites, indent=2) + "\n")
+    (root / "passed").write_text(version + "\n")
+
+
+def matrix(source):
+    # This preflight MUST precede all Nix evaluation/development-shell entry.
+    # A missing fork fails its lane, but must not suppress the other attempts.
+    fork_error = None
+    fork = None
+    try:
+        if os.environ.get("IN_NIX_SHELL") or os.environ.get("YEETUBE_ENV_WRAPPED"):
+            raise ValueError("Run make test-matrix outside Nix to resolve Thanos Emacs fork")
+        fork = executable(os.environ.get("THANOS_EMACS", "emacs"))
+        print(f"Thanos Emacs fork resolved before Nix: {fork}", flush=True)
+    except ValueError as error:
+        fork_error = str(error)
+    ref = "git+" + source.as_uri()
+    root = Path(tempfile.mkdtemp(prefix="yeetube-matrix-"))
+    print(f"Matrix evidence: {root}", flush=True)
+    failed = []
+    archive_error = None
+    try:
+        # Freeze the Git-aware input once so later lanes cannot read a different
+        # working-tree generation.  Archive also realizes the source closure.
+        archive = json.loads(subprocess.check_output(
+            [executable("nix"), "flake", "archive", "--json", "--no-write-lock-file", ref],
+            text=True))
+        source = Path(archive["path"])
+        if not source.is_dir():
+            raise ValueError("Nix did not realize the matrix source")
+        ref = str(source)
+        (root / "source.json").write_text(json.dumps(archive, indent=2) + "\n")
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError) as error:
+        archive_error = str(error)
+    for name in LABELS:
+        log_path = root / (name + ".log")
+        status = 1
+        with log_path.open("w") as log:
+            try:
+                if name == "fork" and fork_error:
+                    raise ValueError(fork_error)
+                if archive_error:
+                    raise ValueError(archive_error)
+                # Git-aware input avoids copying ignored/private files into the store.
+                command = [executable("nix"), "develop",
+                           ref + "#matrix-" + ("minimum" if name == "minimum" else "default"),
+                           "--command", "python3", str(source / "admin/test-matrix"),
+                           "--lane", name, "--root", str(root / name)]
+                if name == "fork":
+                    command.extend(["--emacs", fork])
+                status = subprocess.run(command, stdout=log, stderr=subprocess.STDOUT,
+                                        check=False).returncode
+            except (OSError, ValueError, subprocess.SubprocessError) as error:
+                log.write(str(error) + "\n")
+        # A successful subprocess without the lane's completion is not success.
+        passed = root / name / "passed"
+        ok = status == 0 and passed.is_file() and bool(passed.read_text().strip())
+        version = passed.read_text().strip() if ok else "incomplete"
+        print(f"{'PASS' if ok else 'FAIL'} {LABELS[name]} ({version}); log: {log_path}", flush=True)
+        if not ok:
+            failed.append(name)
+    if failed:
+        raise RuntimeError("Required matrix lanes failed: " + ", ".join(failed))
+    print("PASS all three required Emacs lanes", flush=True)
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--lane", choices=LABELS)
+    parser.add_argument("--root", type=Path)
+    parser.add_argument("--emacs", default="emacs")
+    parser.add_argument("--expected")
+    args = parser.parse_args()
+    source = Path(__file__).resolve().parent.parent
+    try:
+        if args.lane:
+            if not args.root:
+                parser.error("--lane requires --root")
+            expected = args.expected
+            if args.lane != "fork":
+                expected = expected or os.environ["YEETUBE_MATRIX_VERSION"]
+            if args.lane == "minimum" and expected != minimum_version(source):
+                raise ValueError("Pinned minimum disagrees with Package-Requires")
+            lane(source, args.root.resolve(), args.lane, executable(args.emacs), expected)
+        else:
+            matrix(source)
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+        print(f"FAIL: {error}", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

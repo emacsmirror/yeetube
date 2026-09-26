@@ -3,9 +3,9 @@
 NIX := $(shell command -v nix 2>/dev/null)
 
 ENV_MAKE = $(MAKE) --no-print-directory
-ifeq ($(YEETUBE_ENV_WRAPPED),)
+ifeq ($(YEETUBE_ENV_WRAPPED)$(IN_NIX_SHELL),)
 ifneq ($(NIX),)
-ENV_MAKE = nix develop path:$(CURDIR) --no-write-lock-file --command env YEETUBE_ENV_WRAPPED=1 $(MAKE) --no-print-directory
+ENV_MAKE = nix develop "git+file://$(CURDIR)" --no-write-lock-file --command env YEETUBE_ENV_WRAPPED=1 $(MAKE) --no-print-directory
 endif
 endif
 
@@ -19,11 +19,23 @@ TESTS = test/yeetube-tests.el test/yeetube-youtube-tests.el test/yeetube-scraper
 
 FIXTURES = test/fixtures/search-videorenderer.json test/fixtures/search-lockupviewmodel.json
 
-BATCH = $(EMACS_CMD) -Q --batch -L .
+MATRIX_FILES = admin/test-matrix admin/matrix-ert.el admin/test-matrix-runner.py admin/test-matrix-negative.py
+
+BATCH = $(EMACS_CMD) -Q --batch -L . -L test
 
 .PHONY: all compile do-compile test do-test lint do-lint clean dev load
 
 all: compile
+
+.PHONY: test-matrix do-matrix-test test-matrix-negative
+test-matrix:
+	@python3 admin/test-matrix
+
+test-matrix-negative:
+	@python3 admin/test-matrix-negative.py
+
+do-matrix-test:
+	@$(BATCH) $(foreach f,$(TESTS),--eval "(require '$(basename $(notdir $(f))))") -l admin/matrix-ert.el
 
 compile:
 	@$(ENV_MAKE) do-compile

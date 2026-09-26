@@ -189,6 +189,12 @@ lint and ERT gates in an isolated Nix build, using pinned dependencies.
 Source, test and fixture files are listed in the Makefile's =SRCS=,
 =TESTS= and =FIXTURES= manifests; add new files there so Nix includes them.
 
+=make test-matrix= tests exact Emacs 29.1, the pinned nixpkgs default,
+and *Thanos Emacs fork*.  Thanos uses his own installed Emacs fork; run
+outside Nix, optionally with =THANOS_EMACS=/absolute/path/to/emacs=.
+=make test TESTS=test/yeetube-scraper-tests.el= keeps focused runs available.
+=make test-matrix-negative= checks rejection of a version-only executable.
+
 =make load= removes local bytecode and reloads source modules in dependency
 order through =emacsclient=.  It stops on the first failure and only reports
 success after all modules load and buffer keymaps are refreshed.  This
